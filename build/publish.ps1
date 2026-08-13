@@ -9,9 +9,20 @@
     silently — the app builds, publishes, and then fails at runtime with a missing-type error that points
     nowhere useful. The size saving is not worth that class of bug.
 
+.PARAMETER Portable
+    Windows only. Produces a portable build: unzip anywhere and run, with settings, caches, logs and a
+    downloaded adb kept in a Data folder beside the executable instead of in the user's profile. A marker
+    file named Handspan.portable is what switches the app into that mode (see PortableMode.cs).
+
+    Native libraries stay next to the exe rather than being bundled for self-extraction. A single-file
+    build with IncludeNativeLibrariesForSelfExtract unpacks ~40 MB into %TEMP% on first run and leaves it
+    there — which defeats the purpose of a build whose promise is that it writes nothing to the machine,
+    and costs a noticeable pause on first launch. The managed assemblies are still bundled into the exe.
+
 .EXAMPLE
     ./build/publish.ps1 -Runtime win-x64
     ./build/publish.ps1 -Runtime all -Version 0.4.0
+    ./build/publish.ps1 -Runtime win-x64 -Portable -Version 0.6.0
 #>
 [CmdletBinding()]
 param(
@@ -20,17 +31,37 @@ param(
 
     [string]$Version = '0.1.0',
 
+    [switch]$Portable,
+
     [string]$OutputRoot = "$PSScriptRoot/../artifacts"
 )
 
 $ErrorActionPreference = 'Stop'
 
 $project = Join-Path $PSScriptRoot '../src/Handspan.App/Handspan.App.csproj'
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $runtimes = if ($Runtime -eq 'all') { @('win-x64', 'win-arm64', 'osx-x64', 'osx-arm64') } else { @($Runtime) }
 
+if ($Portable) {
+    $nonWindows = $runtimes | Where-Object { $_ -notlike 'win-*' }
+    if ($nonWindows) {
+        throw "-Portable applies to Windows runtimes only; got: $($nonWindows -join ', ')"
+    }
+}
+
 foreach ($rid in $runtimes) {
-    $output = Join-Path $OutputRoot $rid
+    # The portable folder is named for what it is, because that name becomes the single top-level
+    # directory inside the zip and therefore the folder the user ends up running the app from.
+    $output = if ($Portable) {
+        Join-Path $OutputRoot "Handspan-$Version-$rid-portable"
+    } else {
+        Join-Path $OutputRoot $rid
+    }
     Write-Host "Publishing $rid -> $output" -ForegroundColor Cyan
+
+    # A stale layout is worse here than elsewhere: leftover files from a previous run end up inside the
+    # zip that gets handed to users.
+    if (Test-Path $output) { Remove-Item $output -Recurse -Force }
 
     dotnet publish $project `
         --configuration Release `
@@ -38,7 +69,7 @@ foreach ($rid in $runtimes) {
         --self-contained true `
         --output $output `
         -p:PublishSingleFile=true `
-        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:IncludeNativeLibrariesForSelfExtract=$(if ($Portable) { 'false' } else { 'true' }) `
         -p:PublishTrimmed=false `
         -p:DebugType=embedded `
         -p:Version=$Version `
@@ -46,6 +77,11 @@ foreach ($rid in $runtimes) {
 
     if ($LASTEXITCODE -ne 0) {
         throw "publish failed for $rid"
+    }
+
+    if ($Portable) {
+        & (Join-Path $PSScriptRoot 'make-portable.ps1') `
+            -PublishDir $output -RepoRoot $repoRoot -Version $Version
     }
 
     if ($rid -like 'osx-*') {

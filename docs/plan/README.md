@@ -8,9 +8,9 @@ something runnable and independently verifiable.
 
 ## Hardware validation (2026-08-13)
 
-First run against a real device: **Samsung Galaxy S24 Ultra (SM-S928B), Android 16, USB**. All 340 tests
-pass with nothing skipped. With no phone attached, 30 of those skip and the rest still pass — which is
-what CI runs.
+First run against a real device: **Samsung Galaxy S24 Ultra (SM-S928B), Android 16, USB**. All tests pass
+with nothing skipped. With no phone attached, 29 of the 347 skip and the rest still pass — which is what
+CI runs.
 
 | Verified on hardware | Result |
 |---|---|

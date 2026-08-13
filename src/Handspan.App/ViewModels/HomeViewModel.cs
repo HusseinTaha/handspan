@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Handspan.App.Platform;
 using Handspan.Core.Exceptions;
 using Handspan.Core.Interfaces;
 using Handspan.Core.Models;
@@ -58,6 +59,18 @@ public sealed partial class HomeViewModel : ViewModelBase
     public string AppDataFolder { get; }
 
     public string DownloadFolder { get; }
+
+    /// <summary>
+    /// Explains the folder above when it is not the ordinary per-user one, or when it was meant to be
+    /// portable and could not be. Null in the normal installed case, which needs no explanation.
+    /// </summary>
+    public string? DataLocationNote => PortableMode.IsEnabled
+        ? "Portable: settings, cache and logs are kept beside the application, not on this PC."
+        : PortableMode.FallbackReason is { } reason
+            ? $"Portable mode is not active — {reason}."
+            : null;
+
+    public bool HasDataLocationNote => DataLocationNote is not null;
 
     public string RuntimeVersion => Environment.Version.ToString();
 

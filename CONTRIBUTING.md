@@ -10,7 +10,7 @@ You need the **.NET 10 SDK** and nothing else. No workloads, no Visual Studio, n
 
 ```sh
 dotnet build
-dotnet test                                   # 340 tests, ~40 s
+dotnet test                                   # 347 tests, ~40 s
 dotnet run --project src/Handspan.App
 ```
 

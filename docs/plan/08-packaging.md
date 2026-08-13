@@ -8,6 +8,27 @@ Can start as soon as phase 3 lands, since end-of-phase-3 is the natural first re
 `osx-arm64`; `build/make-app-bundle.ps1` wraps the macOS output in a `.app` with an `Info.plist`. The
 Windows build has been verified to launch on this machine with no .NET installed alongside it.
 
+**The Windows portable build is done** — `publish.ps1 -Runtime win-x64 -Portable`, which calls
+`build/make-portable.ps1`. It is the first shippable artifact: 44.8 MB zip, 106 MB extracted, nine files.
+Two decisions in it are worth knowing:
+
+- **Data goes beside the executable, in `Data\`**, switched on by a marker file named `Handspan.portable`
+  (see `src/Handspan.App/Platform/PortableMode.cs`). Settings, the SQLite databases, the thumbnail cache,
+  logs and a downloaded adb all follow `IShellIntegration.GetAppDataFolder()`, so one seam moved all of
+  them. A marker present but the folder unwritable — unzipped under Program Files, or a write-protected
+  stick — falls back to per-user data rather than refusing to start, and says so on the Home page.
+- **Native libraries sit next to the exe rather than being bundled for self-extraction.**
+  `IncludeNativeLibrariesForSelfExtract` unpacks ~40 MB into `%TEMP%` on first run and leaves it there,
+  which contradicts the one promise a portable build makes, and costs a visible pause on first launch.
+  Managed assemblies are still bundled, so it is `Handspan.exe` plus four DLLs.
+
+Verified by extracting the zip to a clean folder and running it: launches, writes `Data\logs\`, logs
+"Running in portable mode", and leaves `%LOCALAPPDATA%\Handspan` byte-for-byte and timestamp-for-timestamp
+identical across the run.
+
+Not yet built: `win-arm64` portable (the same command with a different `-Runtime`, untested for want of an
+ARM machine), and the installer.
+
 **Trimming is off, deliberately.** Avalonia resolves XAML types by reflection and the trimmer removes them
 silently — the app publishes cleanly and then fails at runtime pointing nowhere useful. Not worth the saving.
 
@@ -24,8 +45,12 @@ notarization and stapling, and the installer wrappers (Inno Setup / DMG).
 - Self-contained `win-x64` and `win-arm64`, single-file, trimmed only if verified safe
   (Avalonia + reflection-based XAML can break under aggressive trimming — measure, don't
   assume).
+- **Portable zip** (done): unzip and run, all data in `Data\` beside the executable. This is the
+  distribution to lead with — it needs no installer, no admin rights and no code-signing certificate to be
+  useful, and it is the only form that works on a locked-down work PC.
 - **Installer**: Inno Setup for a plain per-user install, or MSIX if Store distribution is ever
-  wanted. Per-user by default so no admin prompt.
+  wanted. Per-user by default so no admin prompt. An installed build must **not** ship the portable
+  marker, or it will write into Program Files.
 - **Authenticode signing** — without it, SmartScreen will scare users away from a file-transfer
   utility, which is exactly the wrong first impression.
 - Ship `platform-tools` under `tools/`, or fetch on first run (§4.1) to keep the installer small.

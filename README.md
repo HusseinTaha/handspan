@@ -19,6 +19,25 @@ analysis are all implemented and have been exercised against a real phone. See
 | Platforms | Windows 10/11 (x64, arm64), macOS 12+ (Intel, Apple Silicon) |
 | Licence | MIT |
 
+## Getting it — Windows portable
+
+The Windows build is **portable**: unzip it anywhere and run `Handspan.exe`. There is no
+installer, nothing needs admin rights, and .NET is included.
+
+```powershell
+./build/publish.ps1 -Runtime win-x64 -Portable -Version 0.6.0
+# -> artifacts/Handspan-0.6.0-win-x64-portable.zip   (44.8 MB, 106 MB extracted)
+```
+
+Everything it writes — settings, the file index, thumbnail caches, logs, and adb if you let it
+download one — goes into a `Data` folder beside the executable, so it can live on a USB stick
+and leaves nothing behind on the PC. That behaviour is switched on by the presence of a file
+named `Handspan.portable`; delete it to use `%LOCALAPPDATA%\Handspan` like an ordinary app.
+Unzip it somewhere unwritable and it still starts, falling back to per-user data and saying so
+on the Home page rather than failing.
+
+Not code-signed yet, so Windows will show an "unrecognized app" warning on first run.
+
 ## Why it's fast
 
 It talks the documented ADB **host and sync protocol** directly over a local TCP socket,
@@ -92,7 +111,7 @@ Requires only the **.NET 10 SDK** — no workloads, no Visual Studio, no Android
 
 ```sh
 dotnet build                            # 11 projects
-dotnet test                             # 340 tests
+dotnet test                             # 347 tests
 dotnet run --project src/Handspan.App   # launch
 ```
 
@@ -102,13 +121,18 @@ macOS) and can be launched directly — faster than `dotnet run` after the first
 ### Publishing
 
 ```powershell
-./build/publish.ps1 -Runtime all -Version 0.5.0
+./build/publish.ps1 -Runtime win-x64 -Portable -Version 0.6.0   # portable zip
+./build/publish.ps1 -Runtime all -Version 0.6.0                 # all four RIDs
 ./build/make-app-bundle.ps1 -PublishDir artifacts/osx-arm64 -Suffix arm64
 ```
 
 Builds are self-contained and single-file, so a user needs no .NET install. Trimming is
 deliberately off: Avalonia resolves XAML types by reflection and the trimmer removes them
 silently, producing a build that publishes cleanly and then fails at runtime.
+
+`-Portable` differs in one more way: native libraries stay next to the exe instead of being
+bundled for self-extraction. Self-extraction unpacks ~40 MB into `%TEMP%` on first run and
+leaves it there, which is precisely what a portable build promises not to do.
 
 macOS bundles are assembled on Windows, so the final `chmod +x` and quarantine-clearing step
 runs on the Mac itself — `finish-macos-build.sh` is generated next to the bundle for that.
@@ -130,8 +154,9 @@ silently — or you can install it yourself:
 ### Application data
 
 Settings, the transfer journal, caches and logs live in `%LOCALAPPDATA%\Handspan` on
-Windows and `~/Library/Application Support/Handspan` on macOS. Deleting the folder
-resets the app completely.
+Windows and `~/Library/Application Support/Handspan` on macOS — or in `Data` beside the
+executable for the [portable build](#getting-it--windows-portable). Deleting the folder resets
+the app completely. The Home page always shows the one actually in use.
 
 ## Requirements on the phone
 

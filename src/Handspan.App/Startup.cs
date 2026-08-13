@@ -25,7 +25,20 @@ internal static class Startup
         var platform = PlatformModule.Create();
         var appData = platform.ShellIntegration.GetAppDataFolder();
 
-        services.AddLogging(builder => builder.AddSerilog(CreateLogger(appData), dispose: true));
+        var logger = CreateLogger(appData);
+        services.AddLogging(builder => builder.AddSerilog(logger, dispose: true));
+
+        // Worth a line in the log: which of the two data locations is in use decides where a support
+        // request should look, and a portable build that quietly fell back to per-user data is the single
+        // most confusing state this app has. The folder itself is never logged (§43) — the UI shows it.
+        if (PortableMode.IsEnabled)
+        {
+            logger.Information("Running in portable mode; data is stored beside the application.");
+        }
+        else if (PortableMode.FallbackReason is { } reason)
+        {
+            logger.Warning("Portable mode was requested but not used: {Reason}.", reason);
+        }
 
         // Platform seam: one implementation per OS, resolved once at startup.
         services.AddSingleton(platform.ShellIntegration);
