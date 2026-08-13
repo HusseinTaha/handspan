@@ -19,10 +19,28 @@ analysis are all implemented and have been exercised against a real phone. See
 | Platforms | Windows 10/11 (x64, arm64), macOS 12+ (Intel, Apple Silicon) |
 | Licence | MIT |
 
-## Getting it — Windows portable
+## Download
 
-The Windows build is **portable**: unzip it anywhere and run `Handspan.exe`. There is no
-installer, nothing needs admin rights, and .NET is included.
+**[Latest release →](https://github.com/HusseinTaha/handspan/releases/latest)**
+
+| | Platform | |
+|---|---|---|
+| [`Handspan-0.6.0-win-x64-portable.zip`](https://github.com/HusseinTaha/handspan/releases/download/v0.6.0/Handspan-0.6.0-win-x64-portable.zip) | Windows 10/11 x64 | Unzip and run. **Start here.** |
+| [`Handspan-0.6.0-macos-apple-silicon.zip`](https://github.com/HusseinTaha/handspan/releases/download/v0.6.0/Handspan-0.6.0-macos-apple-silicon.zip) | macOS 12+, Apple Silicon | Needs one setup command |
+| [`Handspan-0.6.0-macos-intel.zip`](https://github.com/HusseinTaha/handspan/releases/download/v0.6.0/Handspan-0.6.0-macos-intel.zip) | macOS 12+, Intel | Needs one setup command |
+
+.NET is included in all three. Nothing is code-signed yet, so both operating systems will
+warn on first run.
+
+The macOS bundles are cross-compiled on Windows and **will not launch until you run the
+included `finish-macos-build.sh`** — a Windows-made zip cannot carry the Unix executable bit,
+and Apple Silicon refuses to run unsigned native code. They have also never been run on a
+Mac; treat them as untested and please open an issue with whatever happens.
+
+### The Windows build is portable
+
+Unzip it anywhere and run `Handspan.exe`. There is no installer and nothing needs admin
+rights. To build it yourself:
 
 ```powershell
 ./build/publish.ps1 -Runtime win-x64 -Portable -Version 0.6.0
@@ -155,7 +173,7 @@ silently — or you can install it yourself:
 
 Settings, the transfer journal, caches and logs live in `%LOCALAPPDATA%\Handspan` on
 Windows and `~/Library/Application Support/Handspan` on macOS — or in `Data` beside the
-executable for the [portable build](#getting-it--windows-portable). Deleting the folder resets
+executable for the [portable build](#the-windows-build-is-portable). Deleting the folder resets
 the app completely. The Home page always shows the one actually in use.
 
 ## Requirements on the phone
