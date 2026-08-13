@@ -1,0 +1,2685 @@
+Yes — ADB is probably the right foundation if your goal is a much better Windows ↔ Android file-transfer experience than Windows' built-in MTP/mobile-drive interface.
+
+The key distinction is:
+
+MTP (Media Transfer Protocol) → what Windows commonly uses when you plug in an Android phone and browse it like a drive. It's often slow, flaky, and has poor file-operation semantics.
+ADB (Android Debug Bridge) → a command/transport protocol designed for communicating with Android devices over USB (and also Wi-Fi). It gives your app much more control.
+Your app → can build a nice Explorer-like UI on top of ADB, without exposing the ugly MTP experience to the user.
+What I'd build
+
+Something like:
+
+Windows App
+    │
+    │ USB
+    ▼
+   ADB
+    │
+    ▼
+ Android device
+    │
+    ├── /sdcard/
+    ├── /sdcard/DCIM/
+    ├── /sdcard/Download/
+    └── ...
+
+
+Your Windows app could provide:
+
+📁 Fast folder browsing
+⬆️ Drag & drop PC → phone
+⬇️ Drag & drop phone → PC
+📦 Multi-file transfers
+📊 Real-time transfer progress
+⏸️ Pause/resume
+🔄 Automatic retry
+🗑️ Delete/rename/create folders
+🔍 Search
+🖼️ Image/video thumbnails
+📱 Multiple connected phones
+⚡ Parallel transfers where appropriate
+🔌 Automatic device detection
+🧹 No need to use the Windows "Phone" / MTP interface
+ADB commands give you most of the primitives
+
+For example:
+
+adb devices
+
+
+Find connected devices.
+
+adb shell ls -la /sdcard/
+
+
+Browse files.
+
+adb pull /sdcard/DCIM/photo.jpg C:\Photos\
+
+
+Android → Windows.
+
+adb push C:\Photos\photo.jpg /sdcard/DCIM/
+
+
+Windows → Android.
+
+And you can execute shell operations:
+
+adb shell mkdir /sdcard/MyFolder
+adb shell rm /sdcard/file.txt
+adb shell mv /sdcard/a.txt /sdcard/b.txt
+
+
+So yes, ADB can be the transport layer, while your application handles the user experience.
+
+One important catch
+
+ADB isn't quite a drop-in replacement for a filesystem.
+
+For example, Android's /sdcard is generally emulated/shared storage, and modern Android versions have increasingly restrictive storage/security behavior. You should design your application around Android's storage model rather than assuming you have unrestricted access to the entire filesystem.
+
+Also, the user normally needs to enable USB debugging and authorize your Windows computer on the phone.
+
+I'd actually consider two modes
+1. ADB mode — your primary/high-performance mode
+
+Best for users who enable USB debugging.
+
+USB
+ ↓
+ADB
+ ↓
+Your transfer engine
+
+
+This gives you the most control.
+
+2. MTP fallback
+
+If ADB isn't available:
+
+USB
+ ↓
+MTP
+ ↓
+Your application
+
+
+This lets your app still work with phones where USB debugging isn't enabled.
+
+You don't necessarily have to expose MTP's awful UI — you can implement your own abstraction over it.
+
+Even better: don't make the UI depend directly on ADB
+
+I'd architect it roughly like this:
+
+                 ┌─────────────────────┐
+                 │     Windows UI      │
+                 │ Explorer / Avalonia │
+                 │    / WinUI / WPF    │
+                 └──────────┬──────────┘
+                            │
+                 ┌──────────▼──────────┐
+                 │   File System API   │
+                 │                     │
+                 │ list / copy / move  │
+                 │ delete / rename     │
+                 │ mkdir / stat        │
+                 └──────────┬──────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+       ┌──────▼──────┐             ┌──────▼──────┐
+       │ ADB Backend │             │ MTP Backend │
+       └──────┬──────┘             └──────┬──────┘
+              │                           │
+           USB/ADB                       USB/MTP
+              │                           │
+       ┌──────▼──────┐             ┌──────▼──────┐
+       │   Android   │             │   Android   │
+       └─────────────┘             └─────────────┘
+
+
+That architecture is much better than building an "ADB file manager."
+
+Your UI thinks in terms of:
+
+Device
+ └── Directory
+      ├── File
+      ├── File
+      └── Directory
+
+
+and doesn't care whether the underlying transport is ADB, MTP, or potentially something else later.
+
+And there's an interesting third option
+
+If you control the Android app too, I'd seriously consider:
+
+USB → your Android companion app → custom transfer protocol
+
+instead of ADB.
+
+You can have the Android app expose a local service/protocol and use USB communication, giving you complete control over:
+
+authentication
+directory access
+file streaming
+compression
+checksums
+resume
+parallel transfers
+permissions
+thumbnails
+metadata
+
+That can ultimately be a better product than ADB.
+
+But if you want "install my Windows app, plug in almost any Android phone, and transfer files much better than MTP", I'd start with ADB.
+
+If you tell me what stack you want to use (C#/.NET, C++/Qt, Rust, Electron, Python, etc.), I can suggest the exact architecture and libraries I'd use for the Windows side.
+
+Absolutely. If the goal is a real Android file manager + gallery for Windows, I would expand the project beyond "ADB file transfer" into a proper Android device explorer.
+
+The important architectural decision is: ADB should be the transport layer, not the application architecture.
+
+Below is the project specification I would use as the foundation.
+
+Android Explorer for Windows
+Product & Technical Specification
+
+Status: Proposed
+Platform: Windows 10/11
+Primary connection: USB + ADB
+Optional connection: ADB over Wi-Fi
+Target: Modern Android phones and tablets
+Primary goal: Provide a fast, reliable Windows-native file manager and gallery for Android devices, avoiding the limitations of Windows MTP.
+
+1. Product Vision
+
+Android Explorer is a Windows desktop application that provides a high-quality Explorer-like interface for Android devices connected to a PC.
+
+The application should allow the user to:
+
+Browse Android storage
+Navigate folders
+View files
+Search files
+Copy files between Windows and Android
+Move files
+Rename files
+Delete files
+Create directories
+Drag and drop files
+View images
+Browse photos as a gallery
+Play videos
+Preview documents and other supported files
+View file metadata
+Transfer multiple files simultaneously
+Monitor transfer progress
+Connect multiple Android devices
+Automatically detect USB connection/disconnection
+Resume interrupted transfers where possible
+Use Android ADB as the primary transport
+Optionally support ADB over Wi-Fi
+Fall back to MTP where appropriate
+
+The application should feel like:
+
+Windows Explorer + Photos + a high-performance Android device manager.
+
+2. Core Design Principle
+
+Do not make the UI directly dependent on ADB.
+
+Use this architecture:
+
+┌──────────────────────────────────────────────────────┐
+│                    Windows UI                        │
+│                                                      │
+│ Explorer │ Gallery │ Search │ Transfers │ Devices   │
+└───────────────────────┬──────────────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────────────┐
+│                Application Services                  │
+│                                                      │
+│ File Browser                                         │
+│ Gallery                                             │
+│ Search                                               │
+│ Transfer Manager                                     │
+│ Thumbnail Manager                                    │
+│ Metadata Manager                                     │
+│ Device Manager                                       │
+└───────────────────────┬──────────────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────────────┐
+│              Virtual Device File System              │
+│                                                      │
+│ IDeviceFileSystem                                    │
+│ IDeviceFile                                          │
+│ IDeviceDirectory                                     │
+│ IDeviceStream                                        │
+└───────────────┬───────────────────────┬──────────────┘
+                │                       │
+        ┌───────▼────────┐      ┌───────▼────────┐
+        │   ADB Backend  │      │   MTP Backend  │
+        │                │      │                │
+        │ USB            │      │ Windows MTP    │
+        │ Wi-Fi          │      │                │
+        └───────┬────────┘      └───────┬────────┘
+                │                       │
+                └───────────┬───────────┘
+                            │
+                      Android Device
+
+
+This means that the UI does not care whether a file came from ADB or MTP.
+
+3. Recommended Technology Stack
+Windows
+
+Recommended:
+
+C#
+.NET
+WinUI 3
+Windows App SDK
+XAML
+MVVM
+
+Microsoft currently recommends WinUI 3 / Windows App SDK for new native Windows desktop applications. 
+M
+Microsoft Learn
++1
+
+A good project structure would be:
+
+AndroidExplorer
+│
+├── AndroidExplorer.App
+│   ├── Views
+│   ├── ViewModels
+│   ├── Controls
+│   ├── Resources
+│   └── Assets
+│
+├── AndroidExplorer.Core
+│   ├── Models
+│   ├── Interfaces
+│   ├── Services
+│   └── Exceptions
+│
+├── AndroidExplorer.Adb
+│   ├── AdbClient
+│   ├── AdbDevice
+│   ├── AdbFileSystem
+│   ├── AdbTransfer
+│   └── AdbShell
+│
+├── AndroidExplorer.Mtp
+│   ├── MtpDevice
+│   ├── MtpFileSystem
+│   └── MtpTransfer
+│
+├── AndroidExplorer.Media
+│   ├── ImageService
+│   ├── VideoService
+│   ├── ThumbnailService
+│   └── MetadataService
+│
+├── AndroidExplorer.Search
+│   ├── Indexer
+│   └── SearchService
+│
+└── AndroidExplorer.Tests
+
+4. Android Connection Architecture
+4.1 ADB
+
+ADB should be the primary transport.
+
+Android's official Platform-Tools package contains adb, and Google recommends using the latest Platform-Tools because newer releases remain backward-compatible in general. 
+A
+Android Developers
+
+The application should either:
+
+Bundle an approved/versioned copy of Platform-Tools, or
+Allow the user to configure an existing ADB installation.
+
+For a consumer application, bundling the required ADB components is preferable.
+
+5. USB Connection
+
+When a phone is connected:
+
+USB connected
+      ↓
+Device detection
+      ↓
+ADB server
+      ↓
+adb devices
+      ↓
+Device state
+      ↓
+Authorized?
+   /       \
+ No         Yes
+ ↓           ↓
+Prompt       Connect
+user
+
+
+The application should recognize:
+
+device
+unauthorized
+offline
+no device
+unknown
+
+
+ADB requires USB debugging to be enabled, and Android displays an authorization dialog when a new computer attempts to use ADB. 
+A
+Android Developers
++1
+
+6. Device Dashboard
+
+When a device connects, show:
+
+┌───────────────────────────────────────────┐
+│ 📱 Samsung Galaxy S25                     │
+│                                           │
+│ Android 16                                │
+│ 256 GB                                    │
+│                                           │
+│ Storage                                   │
+│ ███████████████████░░░░  174 GB / 256 GB │
+│                                           │
+│ [ Browse Files ] [ Gallery ]              │
+└───────────────────────────────────────────┘
+
+
+Device information:
+
+Manufacturer
+Model
+Android version
+API level
+Device serial
+Storage capacity
+Available storage
+Battery percentage
+Battery charging status
+Connection type
+ADB version
+Device state
+USB speed where detectable
+7. Explorer
+
+The Explorer is the primary interface.
+
+Example:
+
+Android Device
+│
+└── Internal Storage
+    │
+    ├── Android
+    ├── DCIM
+    ├── Documents
+    ├── Download
+    ├── Movies
+    ├── Music
+    ├── Pictures
+    ├── Podcasts
+    └── ...
+
+
+Navigation should support:
+
+Double-click folders
+Back
+Forward
+Up
+Breadcrumb navigation
+Address/path bar
+Keyboard navigation
+Mouse navigation
+Touch navigation
+Right-click context menus
+
+Example breadcrumb:
+
+📱 Galaxy S25
+  > Internal Storage
+  > DCIM
+  > Camera
+
+8. File View Modes
+
+Support:
+
+Details
+Name             Type       Size       Modified
+─────────────────────────────────────────────────
+IMG_001.jpg      JPEG       4.2 MB     Today
+IMG_002.jpg      JPEG       5.8 MB     Today
+video.mp4        MP4        1.2 GB     Yesterday
+
+Large icons
+┌───────┐ ┌───────┐ ┌───────┐
+│ IMAGE │ │ IMAGE │ │ VIDEO │
+│       │ │       │ │       │
+└───────┘ └───────┘ └───────┘
+
+Extra-large thumbnails
+
+Especially useful for:
+
+Photos
+Videos
+Screenshots
+9. File Operations
+
+Required operations:
+
+Read
+List directory
+Read metadata
+Open file
+Download file
+Stream file
+Write
+Upload file
+Upload directory
+Create directory
+Rename
+Move
+Copy
+Delete
+Delete file
+Delete directory
+Recursive delete
+Clipboard
+
+Support:
+
+Copy
+Cut
+Paste
+
+Example:
+
+Windows
+   │
+   │ Ctrl+C
+   ▼
+Transfer Queue
+   │
+   ▼
+Android
+
+10. ADB Transfer Layer
+
+ADB provides push and pull for transferring files and directories, and its shell interface can execute commands on the device. 
+E
+EManual
++1
+
+Conceptually:
+
+Windows → Android
+
+adb push local remote
+
+
+and:
+
+Android → Windows
+
+adb pull remote local
+
+
+The application should NOT expose raw ADB commands to the UI.
+
+Instead:
+
+await transferManager.UploadAsync(source, destination);
+
+
+and:
+
+await transferManager.DownloadAsync(source, destination);
+
+11. Transfer Manager
+
+The Transfer Manager is one of the most important components.
+
+It should maintain a queue:
+
+Transfers
+
+↑ IMG_2938.jpg
+  82% ████████████████░░░░
+  3.4 MB/s
+  12 MB / 15 MB
+
+↑ IMG_2939.jpg
+  Waiting
+
+↓ vacation.zip
+  Waiting
+
+
+Each transfer should have:
+
+Source
+Destination
+Direction
+Total size
+Bytes transferred
+Percentage
+Current speed
+Estimated remaining time
+Status
+Error
+Retry count
+
+Statuses:
+
+Queued
+Preparing
+Transferring
+Paused
+Completed
+Failed
+Cancelled
+Retrying
+
+12. Parallel Transfers
+
+Do not blindly start hundreds of ADB operations.
+
+Use a configurable transfer scheduler.
+
+Example:
+
+Transfer Queue
+      │
+      ▼
+┌─────────────┐
+│ Scheduler   │
+└──────┬──────┘
+       │
+ ┌─────┼─────┐
+ ▼     ▼     ▼
+Job 1 Job 2 Job 3
+
+
+Default:
+
+Small files: limited parallelism
+Large files: fewer simultaneous streams
+
+
+Benchmark this rather than assuming more parallelism is faster.
+
+13. Resume Support
+
+Transfers should support recovery from:
+
+USB disconnect
+Device reboot
+Cable failure
+PC sleep
+ADB restart
+Application crash
+
+For large files:
+
+5 GB file
+
+Transferred:
+3.2 GB
+
+Connection lost
+
+Reconnect
+
+Resume:
+3.2 GB → 5 GB
+
+
+Do not automatically overwrite the destination without checking its state.
+
+14. File Metadata
+
+Every file model should support:
+
+File
+├── Name
+├── FullPath
+├── Size
+├── Type
+├── Extension
+├── IsDirectory
+├── ModifiedTime
+├── AccessTime
+├── Permissions
+├── Owner
+├── MimeType
+└── MediaMetadata
+
+
+Where supported.
+
+15. File System Abstraction
+
+Define:
+
+public interface IDeviceFileSystem
+{
+    Task<IReadOnlyList<DeviceEntry>> ListAsync(
+        DevicePath path,
+        CancellationToken cancellationToken);
+
+    Task<DeviceFileInfo> GetInfoAsync(
+        DevicePath path,
+        CancellationToken cancellationToken);
+
+    Task<Stream> OpenReadAsync(
+        DevicePath path,
+        CancellationToken cancellationToken);
+
+    Task UploadAsync(
+        Stream source,
+        DevicePath destination,
+        IProgress<TransferProgress> progress,
+        CancellationToken cancellationToken);
+
+    Task DownloadAsync(
+        DevicePath source,
+        Stream destination,
+        IProgress<TransferProgress> progress,
+        CancellationToken cancellationToken);
+
+    Task CreateDirectoryAsync(DevicePath path);
+
+    Task DeleteAsync(DevicePath path);
+
+    Task RenameAsync(DevicePath source, DevicePath destination);
+}
+
+
+This is the most important abstraction in the application.
+
+16. Android Storage Model
+
+Do not assume Android behaves like a normal Windows filesystem.
+
+Modern Android uses scoped-storage rules for applications, and Android distinguishes app-specific storage, shared media, and other user files. 
+A
+Android Developers
++1
+
+For the Windows ADB client, the practical initial target should be:
+
+/sdcard/
+
+
+which normally represents the user's shared/emulated storage.
+
+Typical locations:
+
+/sdcard/DCIM
+/sdcard/Pictures
+/sdcard/Movies
+/sdcard/Music
+/sdcard/Download
+/sdcard/Documents
+/sdcard/Android
+
+
+The application must gracefully handle paths that are inaccessible or behave differently across Android versions and OEMs.
+
+17. Do NOT Promise Full Root Filesystem Access
+
+The application should distinguish:
+
+User storage
+/sdcard/
+
+System filesystem
+/system
+/data
+/vendor
+/apex
+
+
+The application should NOT claim:
+
+"Browse the entire Android filesystem."
+
+Instead:
+
+"Browse accessible Android storage."
+
+Without root or special device configuration, access to protected Android areas is restricted.
+
+18. Gallery
+
+Gallery should be a first-class feature rather than simply another folder view.
+
+Main gallery:
+
+┌─────────────────────────────────────────┐
+│ Gallery                                 │
+│                                         │
+│ Today                                   │
+│                                         │
+│ [IMG] [IMG] [IMG] [IMG]                 │
+│ [IMG] [IMG] [IMG] [IMG]                 │
+│                                         │
+│ Yesterday                               │
+│                                         │
+│ [IMG] [IMG] [IMG] [IMG]                 │
+└─────────────────────────────────────────┘
+
+19. Gallery Sources
+
+Initially scan common locations:
+
+DCIM/
+Pictures/
+Movies/
+Screenshots/
+Download/
+
+
+But do not hard-code only these directories.
+
+The gallery indexer should allow configurable paths.
+
+20. Media Detection
+
+Detect:
+
+Images
+.jpg
+.jpeg
+.png
+.webp
+.gif
+.heic
+.heif
+.avif
+.bmp
+
+Video
+.mp4
+.mkv
+.mov
+.webm
+.avi
+.3gp
+.m4v
+
+Audio
+.mp3
+.m4a
+.flac
+.wav
+.ogg
+.opus
+
+
+The MIME type should be used when reliable rather than relying exclusively on extensions.
+
+21. Thumbnail System
+
+Do NOT download every full-size image just to display the Explorer.
+
+Use:
+
+Android
+   │
+   │ small transfer
+   ▼
+Thumbnail Cache
+   │
+   ▼
+Windows Gallery
+
+
+For example:
+
+Phone:
+5 MB image
+
+Thumbnail:
+20–100 KB
+
+
+The thumbnail cache should be keyed by:
+
+Device ID
++
+Remote Path
++
+File Size
++
+Modified Time
+
+
+Example:
+
+Device A
+/sdcard/DCIM/Camera/IMG123.jpg
+size=5,123,412
+modified=...
+
+
+If metadata changes, regenerate the thumbnail.
+
+22. Gallery Performance
+
+The gallery must use virtualization.
+
+Do NOT load:
+
+10,000 images
+
+
+into memory at once.
+
+Instead:
+
+Visible items
+     ↓
+Request thumbnails
+     ↓
+Thumbnail cache
+     ↓
+Recycle UI elements
+
+
+This is essential for phones containing tens of thousands of photos.
+
+23. Image Viewer
+
+Double-click an image:
+
+┌───────────────────────────────────────────┐
+│                                           │
+│                 PHOTO                     │
+│                                           │
+│                                           │
+│                                           │
+├───────────────────────────────────────────┤
+│  ←   1 / 342   →       ⬇ Download        │
+└───────────────────────────────────────────┘
+
+
+Features:
+
+Zoom
+Pan
+Rotate
+Fit
+Actual size
+Previous
+Next
+Download
+Delete
+Open with Windows application
+Copy
+Share
+Fullscreen
+24. Video Viewer
+
+Video should preferably be streamed rather than fully downloaded before playback.
+
+Architecture:
+
+Android
+   │
+   │ ADB stream
+   ▼
+Windows stream
+   │
+   ▼
+Media decoder
+   │
+   ▼
+Video player
+
+
+Support:
+
+Play
+Pause
+Seek
+Volume
+Fullscreen
+Playback speed
+Duration
+Resolution
+Codec information
+25. Gallery Timeline
+
+Group media by date:
+
+August 12, 2026
+
+[01] [02] [03] [04] [05]
+
+August 11, 2026
+
+[01] [02] [03] [04]
+
+
+Metadata should be normalized to the user's local timezone where appropriate.
+
+26. Albums
+
+Provide virtual albums:
+
+Gallery
+
+Albums
+├── Camera
+├── Screenshots
+├── Downloads
+├── Videos
+├── WhatsApp
+├── Telegram
+└── Custom folders
+
+
+Albums can be represented by directory paths initially.
+
+Do not assume every Android OEM organizes media identically.
+
+27. Search
+
+Global device search:
+
+🔎 Search Android
+
+"invoice"
+
+
+Results:
+
+Documents
+├── invoice.pdf
+├── invoice-2026.pdf
+└── old-invoice.jpg
+
+
+Filters:
+
+Type:
+☐ Images
+☐ Videos
+☐ Audio
+☐ Documents
+
+Size:
+☐ < 10 MB
+☐ 10–100 MB
+☐ > 100 MB
+
+Date:
+☐ Today
+☐ This week
+☐ This month
+☐ Custom
+
+28. Search Index
+
+Do not recursively scan the entire phone every time the user searches.
+
+Create a local index:
+
+Device
+   ↓
+Scanner
+   ↓
+SQLite
+   ↓
+Search
+
+
+Database:
+
+Files
+--------------------------------
+Id
+DeviceId
+ParentId
+Name
+Path
+Extension
+MimeType
+Size
+ModifiedTime
+IsDirectory
+MediaType
+
+
+Use SQLite FTS for filename search.
+
+29. Directory Caching
+
+When the user opens:
+
+/sdcard/DCIM/Camera
+
+
+cache the listing.
+
+Cache policy:
+
+Open folder
+     ↓
+Display cached contents immediately
+     ↓
+Refresh from device
+     ↓
+Update differences
+
+
+This makes navigation feel dramatically faster.
+
+30. Breadcrumb Navigation
+
+Example:
+
+📱 Pixel 10
+   >
+💾 Internal Storage
+   >
+📁 DCIM
+   >
+📁 Camera
+
+
+Each breadcrumb should be clickable.
+
+31. Drag and Drop
+
+Windows → Android:
+
+Explorer
+   │
+   │ Drag
+   ▼
+Android Explorer
+   │
+   ▼
+/sdcard/Download
+
+
+Android → Windows:
+
+Android Explorer
+   │
+   │ Drag
+   ▼
+Windows Explorer
+
+
+Support dropping:
+
+Files
+Directories
+Multiple files
+32. Context Menu
+
+Right-click:
+
+Open
+Open With
+Download
+Copy
+Cut
+Paste
+Rename
+Delete
+Properties
+Copy Path
+
+
+For media:
+
+Open
+Preview
+Download
+Delete
+Copy
+Properties
+
+33. Properties Dialog
+
+Example:
+
+IMG_8291.jpg
+
+Type:
+JPEG Image
+
+Size:
+4.82 MB
+
+Path:
+/sdcard/DCIM/Camera/IMG_8291.jpg
+
+Modified:
+August 12, 2026 14:32
+
+Resolution:
+4032 × 3024
+
+EXIF:
+Camera: ...
+Lens: ...
+ISO: ...
+Exposure: ...
+GPS: ...
+
+
+GPS metadata should be treated as sensitive and should not be unnecessarily persisted.
+
+34. Transfer Preview
+
+Before a large operation:
+
+Copy 428 files?
+
+Source:
+Android/DCIM/Camera
+
+Destination:
+C:\Pictures\Phone
+
+Total:
+428 files
+7.82 GB
+
+[Cancel] [Start Transfer]
+
+35. Conflict Resolution
+
+When destination already contains a file:
+
+File already exists:
+
+IMG_001.jpg
+
+[Replace]
+[Skip]
+[Rename]
+[Compare]
+
+
+For multiple files:
+
+☐ Apply to all
+
+36. File Comparison
+
+For conflicting files show:
+
+Existing file
+Size: 4.2 MB
+Modified: Aug 10
+
+Incoming file
+Size: 4.8 MB
+Modified: Aug 12
+
+
+Optionally calculate hashes.
+
+Do not hash every file by default because that can be expensive over a phone connection.
+
+37. Transfer Verification
+
+Optional:
+
+Transfer
+   ↓
+Size verification
+   ↓
+Optional hash verification
+
+
+Support:
+
+Size verification
+Optional SHA-256
+Retry on mismatch
+38. Device Hot-Plug
+
+The application should detect:
+
+USB connected
+USB disconnected
+ADB device appeared
+ADB device disappeared
+ADB restarted
+Device unauthorized
+Device offline
+
+
+UI:
+
+● Galaxy S25 connected
+
+
+and:
+
+⚠ Galaxy S25 disconnected
+
+Transfers paused.
+Reconnect device to resume.
+
+39. Multiple Devices
+
+Support:
+
+Devices
+
+● Samsung Galaxy S25
+● Google Pixel 10
+● Tablet
+
+
+Each device gets its own session.
+
+All models and caches must include:
+
+DeviceId
+
+
+to prevent cross-device cache collisions.
+
+40. ADB over Wi-Fi
+
+ADB supports wireless debugging on Android 11 and later. 
+A
+Android Developers
++1
+
+This should be an optional feature.
+
+UI:
+
+Connect Device
+
+USB
+● Connected
+
+Wireless
+[Pair Device]
+
+
+Do not make wireless ADB the default.
+
+USB should be preferred for large transfers because it is predictable and avoids network bandwidth/security issues.
+
+41. Connection Security
+
+The application should never attempt to bypass Android's ADB authorization.
+
+The normal flow is:
+
+USB
+ ↓
+ADB
+ ↓
+Android authorization dialog
+ ↓
+User approves
+ ↓
+Device available
+
+
+Android uses the authorization mechanism to prevent arbitrary ADB commands from being executed by an untrusted computer. 
+A
+Android Developers
+
+42. Privacy
+
+The application should operate locally.
+
+Default policy:
+
+Phone
+  ↕
+Windows PC
+
+
+No cloud.
+
+No upload.
+
+No analytics containing filenames.
+
+No automatic media upload.
+
+No remote server required.
+
+43. Sensitive Data
+
+The application should avoid logging:
+
+File contents
+Photos
+Video
+EXIF GPS
+Personal filenames where possible
+Device identifiers in analytics
+
+Debug logs can use:
+
+Device connected
+Transfer started
+Transfer completed
+
+
+rather than:
+
+Copied:
+/sdcard/Private/...
+
+
+unless verbose diagnostics are explicitly enabled.
+
+44. Offline Operation
+
+The application should work entirely without Internet after installation.
+
+Internet should only be required for:
+
+Application updates
+Optional crash reporting
+Optional diagnostics
+Optional feature downloads
+
+Core file transfer must never depend on Internet connectivity.
+
+45. Performance Targets
+
+Target UX:
+
+Device detection
+
+< 2 seconds after ADB becomes available.
+
+Folder navigation
+
+For normal folders:
+
+< 300 ms perceived response.
+
+Gallery
+
+Initial visible thumbnails:
+
+< 1 second where device/connection allows.
+
+UI
+
+60 FPS scrolling.
+
+Large directory
+
+Support:
+
+10,000+
+
+
+entries without freezing the UI.
+
+Large gallery
+
+Support:
+
+50,000+
+
+
+indexed media items.
+
+These are engineering targets, not guarantees.
+
+46. UI Thread Rule
+
+Never execute ADB operations directly on the UI thread.
+
+Bad:
+
+Button_Click
+   ↓
+adb shell
+   ↓
+wait
+   ↓
+UI
+
+
+Good:
+
+UI
+ ↓
+ViewModel
+ ↓
+Service
+ ↓
+Async ADB
+ ↓
+Result
+ ↓
+UI update
+
+47. Cancellation
+
+Every long-running operation should support cancellation.
+
+Example:
+
+CancellationToken
+
+
+Operations:
+
+Upload
+Download
+Directory scan
+Search
+Thumbnail generation
+Device discovery
+48. Error Handling
+
+Translate technical errors into useful messages.
+
+Instead of:
+
+Exit code 1
+
+
+show:
+
+The Android device disconnected during the transfer.
+
+Instead of:
+
+Permission denied
+
+
+show:
+
+Android denied access to this folder. This location may be protected by Android.
+
+49. Diagnostics
+
+Provide:
+
+Settings
+  > Diagnostics
+
+
+Actions:
+
+[Export Diagnostic Log]
+
+[Restart ADB]
+
+[Rescan Devices]
+
+[Open ADB Logs]
+
+
+Never require users to understand ADB commands.
+
+50. Settings
+General
+Default download folder
+Default upload folder
+Confirm deletes
+Confirm large transfers
+Start with Windows
+Minimize to tray
+Explorer
+Default view
+Sort order
+Show hidden files
+Show file extensions
+Folder refresh behavior
+Transfers
+Maximum concurrent transfers
+Retry count
+Resume behavior
+Verify transfers
+Notification when complete
+Gallery
+Thumbnail quality
+Thumbnail cache size
+Video thumbnail generation
+Timeline grouping
+Connection
+Prefer USB
+Allow wireless ADB
+ADB executable location
+Connection timeout
+51. Trash / Recycle Bin
+
+Do NOT assume Android has a universal recycle bin.
+
+For version 1:
+
+Delete
+ ↓
+Confirmation
+ ↓
+Permanent deletion
+
+
+Later:
+
+Android Explorer Trash
+
+
+can be implemented as an application-managed staging area, but this requires careful design because it consumes storage.
+
+52. File Watcher
+
+ADB does not provide a Windows-style universal filesystem watcher for arbitrary Android shared storage.
+
+Therefore the application should use:
+
+Refresh
++
+Polling
++
+Directory cache
+
+
+where appropriate.
+
+Potential future Android companion functionality could provide better change notifications.
+
+53. Optional Android Companion App
+
+Version 2 can introduce:
+
+Android Explorer Companion
+
+
+installed on the phone.
+
+This unlocks a much richer architecture.
+
+Windows App
+     │
+     │ USB / ADB
+     ▼
+Android Companion
+     │
+     ▼
+Android APIs
+
+
+The companion could use Android's modern storage APIs and media APIs rather than relying exclusively on shell filesystem behavior.
+
+Android's current storage model emphasizes scoped storage and APIs such as MediaStore for shared media. 
+A
+Android Developers
++1
+
+54. Why the Companion App Is Interesting
+
+The Windows application can ask:
+
+Give me all photos
+
+
+instead of:
+
+Search thousands of directories for .jpg
+
+
+The Android component can provide:
+
+Media ID
+URI
+Filename
+Date
+Size
+Width
+Height
+MIME type
+Album
+Location
+
+
+This would make the Gallery dramatically better.
+
+55. Recommended Two-Level Architecture
+
+Eventually:
+
+                    Windows
+                       │
+               ┌───────▼────────┐
+               │ Android        │
+               │ Explorer       │
+               └───────┬────────┘
+                       │
+                Device Abstraction
+                       │
+          ┌────────────┴────────────┐
+          │                         │
+       ADB Direct              Companion
+          │                         │
+          ▼                         ▼
+   Shared filesystem        Android APIs
+
+
+Use ADB direct mode for maximum compatibility.
+
+Use Companion mode for advanced capabilities.
+
+56. Gallery Strategy
+
+I recommend:
+
+Version 1
+
+Use ADB:
+
+Directory scan
+      ↓
+Media detection
+      ↓
+Thumbnail generation
+      ↓
+Gallery
+
+Version 2
+
+Companion:
+
+MediaStore
+   ↓
+Metadata database
+   ↓
+Windows Gallery
+
+
+This gives you a path to a much more sophisticated photo experience.
+
+57. Media Preview Architecture
+
+Use a local abstraction:
+
+IMediaPreviewProvider
+
+
+Implement:
+
+ImagePreviewProvider
+VideoPreviewProvider
+AudioPreviewProvider
+DocumentPreviewProvider
+
+
+The UI shouldn't care where the media came from.
+
+58. Local Streaming
+
+For an image:
+
+ADB
+ ↓
+Stream
+ ↓
+Decoder
+ ↓
+Image viewer
+
+
+Do not necessarily create a permanent local copy.
+
+For large videos:
+
+ADB
+ ↓
+Buffered stream
+ ↓
+Media decoder
+ ↓
+Player
+
+
+This allows the user to preview content without explicitly downloading it.
+
+59. Gallery Cache
+
+Use two caches.
+
+Metadata cache
+
+SQLite:
+
+Media
+-------------------
+Id
+DeviceId
+Path
+Name
+Size
+Modified
+MimeType
+Width
+Height
+Duration
+
+Thumbnail cache
+
+Filesystem:
+
+Cache/
+ └── device-id/
+      ├── hash1.webp
+      ├── hash2.webp
+      └── hash3.webp
+
+
+WebP/AVIF can be evaluated for thumbnail storage.
+
+60. Gallery Database Synchronization
+
+Algorithm:
+
+Open Gallery
+      ↓
+Load SQLite index
+      ↓
+Display immediately
+      ↓
+Background scan
+      ↓
+Detect changes
+      ↓
+Update database
+      ↓
+Refresh UI
+
+
+This gives an "instant" feeling while maintaining correctness.
+
+61. Duplicate Detection
+
+Future feature:
+
+Find Duplicates
+
+
+Groups:
+
+IMG001.jpg
+IMG001 (1).jpg
+IMG001-copy.jpg
+
+
+Use:
+
+Size
+Filename
+Partial hash
+Full hash
+
+in increasing cost order.
+
+62. Storage Analyzer
+
+Future feature:
+
+Storage
+
+256 GB
+
+Photos       82 GB
+Videos       61 GB
+Apps         38 GB
+Downloads    14 GB
+Other        21 GB
+
+
+Click:
+
+Videos
+   ↓
+Largest files
+
+
+Example:
+
+1.8 GB  video.mp4
+1.2 GB  movie.mkv
+842 MB  recording.mp4
+
+
+This would be a strong differentiating feature.
+
+63. Large File Finder
+Largest Files
+
+> 1 GB
+> 500 MB
+> 100 MB
+
+
+Sort:
+
+Size ↓
+
+64. Recent Files
+
+Virtual folder:
+
+Recent
+
+Today
+Yesterday
+This Week
+
+
+No physical Android directory is required.
+
+65. Favorites
+
+Allow users to pin:
+
+⭐ DCIM/Camera
+⭐ Download
+⭐ Documents
+⭐ WhatsApp/Media
+
+
+Favorites are stored locally per device.
+
+66. Quick Access
+
+Sidebar:
+
+QUICK ACCESS
+
+⭐ Camera
+⭐ Downloads
+⭐ Pictures
+⭐ Movies
+
+DEVICE
+
+📱 Galaxy S25
+   Internal Storage
+
+67. Device-specific Profiles
+
+Store:
+
+DeviceId
+DisplayName
+LastConnected
+Favorites
+ViewPreferences
+SortPreferences
+GalleryPreferences
+
+
+Example:
+
+Galaxy S25
+  → Camera = /sdcard/DCIM/Camera
+
+68. Architecture Interfaces
+
+Core interfaces should include:
+
+IDeviceManager
+IDeviceConnection
+IDeviceFileSystem
+ITransferManager
+IThumbnailService
+IGalleryService
+ISearchService
+IMediaPreviewService
+IMetadataService
+ICacheService
+ISettingsService
+
+69. Device Manager
+
+Responsibilities:
+
+Discover devices
+Track connection state
+Connect/disconnect
+Maintain device sessions
+Detect state changes
+Expose device information
+
+Example:
+
+public interface IDeviceManager
+{
+    IReadOnlyList<DeviceInfo> Devices { get; }
+
+    event EventHandler<DeviceChangedEventArgs> DeviceChanged;
+
+    Task RefreshAsync();
+
+    Task<DeviceSession> ConnectAsync(
+        DeviceId deviceId,
+        CancellationToken cancellationToken);
+}
+
+70. Device Session
+
+Every connected device gets:
+
+DeviceSession
+│
+├── Connection
+├── FileSystem
+├── TransferManager
+├── Gallery
+├── Search
+└── Metadata
+
+
+This prevents global state from becoming a mess.
+
+71. ADB Client
+
+Create an internal ADB abstraction:
+
+public interface IAdbClient
+{
+    Task<IReadOnlyList<AdbDevice>> GetDevicesAsync();
+
+    Task<AdbResult> ExecuteAsync(
+        string serial,
+        string command,
+        CancellationToken cancellationToken);
+
+    Task<Stream> ExecuteStreamAsync(
+        string serial,
+        string command,
+        CancellationToken cancellationToken);
+
+    Task PushAsync(...);
+
+    Task PullAsync(...);
+}
+
+
+Important:
+
+Do not construct shell commands from raw user input without proper argument escaping.
+
+72. ADB Process Management
+
+The application should manage the ADB process carefully.
+
+Responsibilities:
+
+Start ADB server
+Detect existing ADB server
+Avoid conflicting versions where possible
+Stop/restart when necessary
+Capture stdout
+Capture stderr
+Detect exit code
+Enforce timeouts
+Cancel operations
+73. Avoid Shell Parsing Where Possible
+
+A common mistake would be:
+
+adb shell ls -la
+
+
+then trying to parse human-readable text.
+
+Prefer structured machine-readable output where possible.
+
+For example, the application can use controlled shell commands and delimiters, or build a small Android-side helper that emits structured records.
+
+This is particularly important for filenames containing:
+
+spaces
+quotes
+unicode
+newlines
+special characters
+
+74. Unicode
+
+The application must correctly support:
+
+العربية
+中文
+日本語
+한국어
+Русский
+emoji
+
+
+Example:
+
+صور العائلة
+照片
+旅行 🌴
+
+
+Never assume ASCII filenames.
+
+75. Path Handling
+
+Android paths should NOT be represented internally as ordinary Windows paths.
+
+Bad:
+
+C:\sdcard\DCIM
+
+
+Good:
+
+DevicePath("/sdcard/DCIM")
+
+
+This prevents accidental mixing of:
+
+C:\
+
+
+and:
+
+/sdcard/
+
+76. Recommended Domain Model
+Device
+DevicePath
+DeviceEntry
+DeviceFile
+DeviceDirectory
+MediaItem
+Album
+TransferJob
+TransferProgress
+StorageInfo
+FileMetadata
+DeviceCapabilities
+
+77. Capability Detection
+
+Different devices may behave differently.
+
+Expose:
+
+DeviceCapabilities
+
+
+such as:
+
+CanBrowseSharedStorage
+CanUpload
+CanDownload
+CanDelete
+CanRename
+CanCreateDirectory
+CanStream
+CanWirelessAdb
+
+
+The UI can then disable unsupported operations rather than failing unexpectedly.
+
+78. Permissions and Protected Locations
+
+The application must handle:
+
+Access denied
+Not found
+Read-only
+Protected
+Device disconnected
+
+
+Example UI:
+
+This Android location is protected and cannot be accessed through the current connection.
+
+Do not attempt to circumvent Android's security model.
+
+79. Android Version Compatibility
+
+The application should maintain a compatibility matrix:
+
+Android version
+OEM
+Device model
+ADB version
+Supported operations
+Known issues
+
+
+Test at minimum across:
+
+Google Pixel
+Samsung
+Xiaomi
+OnePlus
+Motorola
+Oppo
+Vivo
+
+and multiple Android versions.
+
+80. Testing Matrix
+
+Test:
+
+Devices
+USB 2
+USB 3
+USB-C
+Different OEMs
+Different storage sizes
+Files
+Empty files
+1 KB
+1 MB
+1 GB+
+Very large directories
+Unicode names
+Spaces
+Duplicate names
+Hidden files
+Media
+JPEG
+HEIC
+PNG
+WebP
+MP4
+H.265
+HDR video
+4K video
+81. Failure Testing
+
+Simulate:
+
+Disconnect cable during transfer
+Disconnect during directory listing
+Phone goes to sleep
+Phone reboots
+ADB server crashes
+PC sleeps
+PC wakes
+Phone storage becomes unavailable
+Destination disk fills
+Destination folder disappears
+
+
+The application must recover gracefully.
+
+82. UI Navigation
+
+Recommended layout:
+
+┌─────────────────────────────────────────────────────────┐
+│ ← → ↑   🔎 Search                         ⚙ Settings   │
+├───────────────┬─────────────────────────────────────────┤
+│               │                                         │
+│ QUICK ACCESS  │  📱 Galaxy S25                         │
+│               │                                         │
+│ ⭐ Camera     │  > Internal Storage > DCIM > Camera    │
+│ ⭐ Downloads  │                                         │
+│ ⭐ Pictures   │  ┌────┐ ┌────┐ ┌────┐ ┌────┐          │
+│               │  │IMG │ │IMG │ │IMG │ │IMG │          │
+│ DEVICE        │  └────┘ └────┘ └────┘ └────┘          │
+│               │                                         │
+│ 📱 Galaxy     │                                         │
+│               │                                         │
+│ Internal      │                                         │
+│ Storage       │                                         │
+│               │                                         │
+├───────────────┴─────────────────────────────────────────┤
+│ 3 files │ 428 MB                       Transfer: idle   │
+└─────────────────────────────────────────────────────────┘
+
+83. Application Pages
+
+Main navigation:
+
+Home
+Devices
+Explorer
+Gallery
+Transfers
+Search
+Storage
+Settings
+
+84. Home
+
+When no device is connected:
+
+Connect your Android device
+
+Connect via USB
+
+[ Connect Device ]
+
+Need help?
+
+
+When connected:
+
+Galaxy S25
+
+Storage: 174 / 256 GB
+
+[ Browse Files ]
+[ Open Gallery ]
+
+85. Transfers Page
+
+Persistent transfer history:
+
+Transfers
+
+Active
+Completed
+Failed
+
+Today
+  14:32  82 photos → PC       Completed
+  13:54  video.mp4 → Android  Completed
+  12:31  backup.zip → PC      Failed
+
+86. Notifications
+
+Examples:
+
+428 photos transferred successfully.
+
+Transfer paused because Galaxy S25 was disconnected.
+
+3 files could not be transferred.
+
+87. Keyboard Shortcuts
+
+Support familiar Windows shortcuts:
+
+Ctrl+C
+Ctrl+X
+Ctrl+V
+
+Delete
+F2
+Ctrl+A
+
+Alt+Left
+Alt+Right
+
+Backspace
+Enter
+
+Ctrl+F
+Ctrl+L
+
+
+Gallery:
+
+← Previous
+→ Next
+Space Play/Pause
+Esc Close
+F11 Fullscreen
+
+88. Windows Explorer Integration
+
+Future feature:
+
+Expose the device through a virtual shell namespace:
+
+This PC
+└── Android Explorer
+    └── Galaxy S25
+        └── Internal Storage
+
+
+This is significantly more advanced and should not be part of MVP.
+
+The standalone application should come first.
+
+89. MVP
+
+The first production milestone should contain:
+
+Connection
+USB ADB
+Device detection
+Authorization state
+Reconnect
+Explorer
+Directory navigation
+File listing
+Breadcrumbs
+Details view
+Thumbnails
+File metadata
+File operations
+Download
+Upload
+Delete
+Rename
+Create directory
+Copy
+Move
+Transfers
+Progress
+Queue
+Cancellation
+Retry
+Basic resume
+Gallery
+Image grid
+Image viewer
+Video thumbnails
+Video playback
+Date grouping
+UX
+Drag and drop
+Context menu
+Search
+Favorites
+Dark/light mode
+90. Version 1.1
+
+Add:
+
+Better video streaming
+EXIF metadata
+Duplicate detection
+Storage analyzer
+Advanced search
+Transfer verification
+Multiple devices
+Wireless ADB
+91. Version 2
+
+Add:
+
+Android companion application
+MediaStore integration
+Advanced gallery
+Albums
+Android-side indexing
+Better change notifications
+Storage analysis
+Smart backup
+Device migration
+92. Version 3
+
+Potential advanced functionality:
+
+Phone → PC Backup
+
+Photos
+Videos
+Documents
+Contacts*
+Messages*
+App data*
+
+
+Some categories require Android-specific APIs, permissions, or additional system capabilities and should not be assumed to be accessible through ordinary ADB file operations.
+
+93. What ADB Should and Should Not Do
+ADB should handle:
+Device connection
+File transfers
+Remote commands
+Streaming
+Device information
+
+Your application should handle:
+Explorer
+Gallery
+Search
+Caching
+Thumbnails
+Transfers
+Metadata
+UX
+Error handling
+
+Android companion should eventually handle:
+MediaStore
+Modern Android storage APIs
+Media metadata
+Advanced indexing
+
+94. Most Important Performance Principle
+
+Do not implement the gallery as:
+
+for every image:
+    adb pull image
+    generate thumbnail
+
+
+That will feel terrible.
+
+Instead:
+
+Directory scan
+      ↓
+Metadata index
+      ↓
+Thumbnail request
+      ↓
+Small/optimized transfer
+      ↓
+Cache
+      ↓
+Virtualized gallery
+
+
+The same principle applies to Explorer.
+
+95. Recommended MVP Architecture
+
+The initial implementation should therefore be:
+
+                    Windows
+                       │
+                       ▼
+              ┌────────────────┐
+              │    WinUI 3     │
+              └───────┬────────┘
+                      │
+                      ▼
+              ┌────────────────┐
+              │ Application    │
+              │ Services       │
+              └───────┬────────┘
+                      │
+                      ▼
+              ┌────────────────┐
+              │ Device FS API  │
+              └───────┬────────┘
+                      │
+                      ▼
+              ┌────────────────┐
+              │ ADB Transport  │
+              └───────┬────────┘
+                      │
+                      │ USB
+                      ▼
+                Android Phone
+
+
+Then later:
+
+                  Device FS API
+                       │
+             ┌─────────┴─────────┐
+             │                   │
+          ADB FS              MTP FS
+             │
+             │
+       ┌─────┴─────┐
+       │           │
+    Direct      Companion
+    ADB         Android App
+
+96. Product Differentiators
+
+The application should not try to compete merely on:
+
+"We can copy files using ADB."
+
+The real product is:
+
+"A proper Windows file manager for Android."
+
+The differentiators should be:
+
+Extremely fast navigation
+Excellent thumbnails
+Real gallery
+Drag-and-drop
+Reliable transfers
+Transfer resume
+Large-file handling
+Excellent search
+Multiple-device support
+Clean Windows-native UI
+No cloud required
+No MTP drive nonsense
+97. Recommended Development Order
+
+Build in this order:
+
+Phase 1
+│
+├── ADB process manager
+├── Device detection
+├── Device session
+└── Basic ADB commands
+        ↓
+Phase 2
+│
+├── Device filesystem abstraction
+├── Directory listing
+├── File metadata
+└── Explorer UI
+        ↓
+Phase 3
+│
+├── Upload
+├── Download
+├── Delete
+├── Rename
+├── Move
+└── Transfer queue
+        ↓
+Phase 4
+│
+├── Thumbnail engine
+├── Image viewer
+├── Video preview
+└── Gallery
+        ↓
+Phase 5
+│
+├── Search
+├── SQLite index
+├── Favorites
+└── Storage analyzer
+        ↓
+Phase 6
+│
+├── Wireless ADB
+├── Multiple devices
+└── Advanced recovery
+        ↓
+Phase 7
+│
+└── Android companion
+
+98. Final Architecture Recommendation
+
+I would not build this as a simple wrapper around:
+
+adb.exe
+
+
+Instead build:
+
+                ANDROID EXPLORER
+
+┌──────────────────────────────────────────────┐
+│                 WinUI 3 UI                  │
+├──────────────────────────────────────────────┤
+│ Explorer │ Gallery │ Search │ Transfers     │
+├──────────────────────────────────────────────┤
+│               Core Services                 │
+├──────────────────────────────────────────────┤
+│ Device │ FS │ Transfer │ Media │ Cache      │
+├──────────────────────────────────────────────┤
+│            Device Abstraction               │
+├──────────────────────┬───────────────────────┤
+│                      │                       │
+│       ADB            │        MTP            │
+│                      │                       │
+└──────────┬───────────┴────────────┬──────────┘
+           │                        │
+           ▼                        ▼
+       Android                  Android
+
+
+ADB should be the MVP transport.
+
+The Explorer + Gallery + Transfer Manager + caching/indexing layer is where the actual product value lives.
+
+And I would specifically design the system so that an Android companion app can be added later. That is the part that will eventually make the gallery, media metadata, change detection, and modern Android storage handling much better.
+
+For the Windows side, C# + .NET + WinUI 3 + Windows App SDK is my recommendation for this project. WinUI 3 is Microsoft's modern native Windows UI framework and supports C# and C++. 
+M
+Microsoft Learn
++1
+
+For the Android transport, use the official Android SDK Platform-Tools/ADB, rather than trying to implement the ADB protocol yourself initially. 
+A
+Android Developers
+
+One architectural decision I would make very strongly: don't make MTP the primary implementation. Make the application's internal filesystem API transport-neutral, but make ADB the first-class backend. That gives you the fast, controlled experience you're looking for while leaving room to add MTP and an Android companion later.
+:::
+
+M
+A
+E
+Sources

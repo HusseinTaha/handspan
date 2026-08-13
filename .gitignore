@@ -1,0 +1,55 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]64/
+*.user
+*.suo
+*.userprefs
+project.lock.json
+project.fragment.lock.json
+artifacts/
+publish/
+*.app/
+TestResults/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+BenchmarkDotNet.Artifacts/
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+
+## Android Explorer specific
+# Bundled adb: fetched at build/first-run, never committed (Apache-2.0, ~10 MB)
+tools/platform-tools/
+# Bundled LGPL media binaries: fetched by script, never committed
+tools/ffmpeg/
+tools/vlc/
+# Thumbnail + directory caches produced at runtime
+cache/
+*.db
+*.db-shm
+*.db-wal
+# Diagnostic logs may contain file paths when verbose logging is enabled
+logs/
+*.log
+
+## Android companion app (phase 7)
+companion/.gradle/
+companion/build/
+companion/local.properties
+companion/**/build/
+
+## OS noise
+Thumbs.db
+Desktop.ini
+.DS_Store

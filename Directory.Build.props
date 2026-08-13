@@ -1,0 +1,28 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!--
+      Real ICU data is required: this app handles RTL, CJK and emoji filenames, and
+      diacritic-insensitive search (docs/notes.txt section 74). Invariant globalization
+      would silently break sorting and FTS matching.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+
+    <Authors>Android Explorer</Authors>
+    <Product>Android Explorer</Product>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>embedded</DebugType>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>
