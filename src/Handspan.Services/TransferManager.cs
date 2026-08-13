@@ -345,7 +345,7 @@ internal sealed class TransferManager : ITransferManager, IAsyncDisposable
 
         await UpdateAsync(state, job => job with { Status = TransferStatus.Cancelled })
             .ConfigureAwait(false);
-        DeletePartial(state.Job);
+        await DeletePartialAsync(state.Job).ConfigureAwait(false);
     }
 
     public async Task RetryAsync(Guid jobId)
@@ -506,7 +506,7 @@ internal sealed class TransferManager : ITransferManager, IAsyncDisposable
             {
                 await UpdateAsync(state, job => job with { Status = TransferStatus.Cancelled })
                     .ConfigureAwait(false);
-                DeletePartial(state.Job);
+                await DeletePartialAsync(state.Job).ConfigureAwait(false);
             }
             else
             {
@@ -791,7 +791,16 @@ internal sealed class TransferManager : ITransferManager, IAsyncDisposable
         JobChanged?.Invoke(this, new TransferJobChangedEventArgs(state.Job));
     }
 
-    private void DeletePartial(TransferJob job)
+    /// <summary>Removes a cancelled download's partial file (spec §13).</summary>
+    /// <remarks>
+    /// The delete is retried because cancellation unwinds the worker asynchronously: the
+    /// <see cref="FileStream"/> writing this file may not have finished closing, and on Windows a delete
+    /// against an open handle fails with a sharing violation. That window is milliseconds, so giving up on
+    /// the first <see cref="IOException"/> — as this used to — silently left <c>.aepart</c> files behind in
+    /// the user's download folder whenever the race was lost, which is litter the spec's own
+    /// write-to-partial-then-move rule exists to avoid.
+    /// </remarks>
+    private async Task DeletePartialAsync(TransferJob job)
     {
         if (job.Direction != TransferDirection.Download)
         {
@@ -799,15 +808,32 @@ internal sealed class TransferManager : ITransferManager, IAsyncDisposable
         }
 
         var partial = job.LocalPath + PartialSuffix;
-        if (File.Exists(partial))
+        const int attempts = 10;
+
+        for (var attempt = 1; attempt <= attempts; attempt++)
         {
+            if (!File.Exists(partial))
+            {
+                return;
+            }
+
             try
             {
                 File.Delete(partial);
+                return;
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Leaving a stray partial file behind is not worth failing over.
+                if (attempt == attempts)
+                {
+                    // Still worth not failing the cancellation over, but say so rather than hide it.
+                    _logger.LogWarning(
+                        "Could not remove the partial file for a cancelled transfer after {Attempts} attempts.",
+                        attempts);
+                    return;
+                }
+
+                await Task.Delay(20).ConfigureAwait(false);
             }
         }
     }
