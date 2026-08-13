@@ -97,5 +97,8 @@ public interface IDeviceSession : IAsyncDisposable
 
     IDuplicateFinder Duplicates { get; }
 
+    /// <summary>Incremental phone-to-PC backup (spec §92).</summary>
+    IBackupService Backup { get; }
+
     IMetadataService Metadata { get; }
 }

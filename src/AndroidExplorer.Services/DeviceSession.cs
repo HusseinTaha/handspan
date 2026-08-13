@@ -24,7 +24,9 @@ internal sealed class DeviceSession : IDeviceSession
         ITransferManagerFactory transfers,
         IThumbnailServiceFactory thumbnails,
         IGalleryServiceFactory gallery,
-        ISearchServiceFactory search)
+        ISearchServiceFactory search,
+        IBackupServiceFactory backup,
+        ISettingsService settings)
     {
         Info = info;
 
@@ -38,6 +40,7 @@ internal sealed class DeviceSession : IDeviceSession
         Search = search.CreateSearch(info.Id, FileSystem);
         Storage = search.CreateStorageAnalyzer(info.Id, FileSystem);
         Duplicates = search.CreateDuplicateFinder(info.Id, FileSystem);
+        Backup = backup.Create(info.Id, Gallery, settings);
     }
 
     public DeviceId DeviceId => Info.Id;
@@ -59,6 +62,8 @@ internal sealed class DeviceSession : IDeviceSession
     public IStorageAnalyzer Storage { get; }
 
     public IDuplicateFinder Duplicates { get; }
+
+    public IBackupService Backup { get; }
 
     public IMetadataService Metadata =>
         throw new NotSupportedException("Metadata arrives in phase 4 (docs/plan/04-gallery.md).");

@@ -67,6 +67,19 @@ public sealed class AndroidExplorerDatabase(string databasePath, ILogger<Android
 
             await ExecuteAsync(connection, Schema, cancellationToken).ConfigureAwait(false);
 
+            foreach (var migration in Migrations)
+            {
+                try
+                {
+                    await ExecuteAsync(connection, migration, cancellationToken).ConfigureAwait(false);
+                }
+                catch (SqliteException ex) when (ex.Message.Contains("duplicate column",
+                                                    StringComparison.OrdinalIgnoreCase))
+                {
+                    // Already applied on a database from an earlier run.
+                }
+            }
+
             _initialized = true;
             logger.LogInformation("Local cache database is ready.");
         }
@@ -234,4 +247,17 @@ public sealed class AndroidExplorerDatabase(string databasePath, ILogger<Android
             BenchmarkedConcurrency INTEGER NULL
         );
         """;
+
+    /// <summary>
+    /// Columns added after the first release.
+    /// </summary>
+    /// <remarks>
+    /// Applied separately and tolerantly: SQLite has no "ADD COLUMN IF NOT EXISTS", and an existing database
+    /// must keep working rather than being wiped. A duplicate-column error simply means it is already there.
+    /// </remarks>
+    private static readonly string[] Migrations =
+    [
+        "ALTER TABLE DeviceProfiles ADD COLUMN LastBackupUnix INTEGER NULL",
+        "ALTER TABLE DeviceProfiles ADD COLUMN LastBackupFolder TEXT NULL",
+    ];
 }

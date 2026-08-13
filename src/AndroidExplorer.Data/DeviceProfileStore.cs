@@ -40,7 +40,7 @@ public sealed class SqliteDeviceProfileStore(
             await using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT DisplayName, LastConnectedUnix, GallerySourcesJson, PreferredView, SortOrder,
-                       BenchmarkedConcurrency
+                       BenchmarkedConcurrency, LastBackupUnix, LastBackupFolder
                 FROM DeviceProfiles WHERE DeviceId = $device
                 """;
             command.Parameters.AddWithValue("$device", device.Serial);
@@ -62,6 +62,10 @@ public sealed class SqliteDeviceProfileStore(
                     PreferredView = reader.IsDBNull(3) ? null : reader.GetString(3),
                     SortOrder = reader.IsDBNull(4) ? null : reader.GetString(4),
                     BenchmarkedConcurrency = reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                    LastBackupAt = reader.IsDBNull(6)
+                        ? null
+                        : DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(6)),
+                    LastBackupFolder = reader.IsDBNull(7) ? null : reader.GetString(7),
                 };
             }
         }
@@ -85,15 +89,18 @@ public sealed class SqliteDeviceProfileStore(
             command.CommandText = """
                 INSERT INTO DeviceProfiles
                     (DeviceId, DisplayName, LastConnectedUnix, FavoritesJson, GallerySourcesJson,
-                     PreferredView, SortOrder, BenchmarkedConcurrency)
-                VALUES ($device, $name, $connected, NULL, $gallery, $view, $sort, $concurrency)
+                     PreferredView, SortOrder, BenchmarkedConcurrency, LastBackupUnix, LastBackupFolder)
+                VALUES ($device, $name, $connected, NULL, $gallery, $view, $sort, $concurrency,
+                        $backupAt, $backupFolder)
                 ON CONFLICT (DeviceId) DO UPDATE SET
                     DisplayName = $name,
                     LastConnectedUnix = $connected,
                     GallerySourcesJson = $gallery,
                     PreferredView = $view,
                     SortOrder = $sort,
-                    BenchmarkedConcurrency = $concurrency
+                    BenchmarkedConcurrency = $concurrency,
+                    LastBackupUnix = $backupAt,
+                    LastBackupFolder = $backupFolder
                 """;
 
             command.Parameters.AddWithValue("$device", profile.DeviceId.Serial);
@@ -108,6 +115,10 @@ public sealed class SqliteDeviceProfileStore(
             command.Parameters.AddWithValue("$sort", (object?)profile.SortOrder ?? DBNull.Value);
             command.Parameters.AddWithValue("$concurrency",
                 profile.BenchmarkedConcurrency is { } value ? value : (object)DBNull.Value);
+            command.Parameters.AddWithValue("$backupAt",
+                profile.LastBackupAt is { } backup ? backup.ToUnixTimeSeconds() : DBNull.Value);
+            command.Parameters.AddWithValue("$backupFolder",
+                (object?)profile.LastBackupFolder ?? DBNull.Value);
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }

@@ -397,6 +397,9 @@ public sealed class ExplorerRefreshTests
 
         public IDuplicateFinder Duplicates => throw new NotSupportedException();
 
+        public IBackupService Backup => throw new NotSupportedException();
+
+
         public IMetadataService Metadata => throw new NotSupportedException();
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -474,5 +477,6 @@ public sealed class ExplorerRefreshTests
         public string GetAppDataFolder() => Path.GetTempPath();
     }
 }
+
 
 

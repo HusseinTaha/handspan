@@ -26,6 +26,8 @@ internal sealed class DeviceManager(
     IThumbnailServiceFactory thumbnails,
     IGalleryServiceFactory gallery,
     ISearchServiceFactory search,
+    IBackupServiceFactory backup,
+    ISettingsService settings,
     MediaPreviewService previews,
     ILogger<DeviceManager> logger) : IDeviceManager
 {
@@ -143,7 +145,7 @@ internal sealed class DeviceManager(
             }
 
             var session = new DeviceSession(
-                info, fileSystemFactory, cache, transfers, thumbnails, gallery, search);
+                info, fileSystemFactory, cache, transfers, thumbnails, gallery, search, backup, settings);
 
             // Journalled transfers come back as paused, ready to resume (spec §13).
             await session.RestoreTransfersAsync(cancellationToken).ConfigureAwait(false);

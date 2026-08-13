@@ -19,6 +19,7 @@ public static class MediaServiceCollectionExtensions
 
         services.AddSingleton<IThumbnailServiceFactory, ThumbnailServiceFactory>();
         services.AddSingleton<IGalleryServiceFactory, GalleryServiceFactory>();
+        services.AddSingleton<IBackupServiceFactory, BackupServiceFactory>();
 
         // One loopback streaming server for the whole application; it is started lazily on first use.
         services.AddSingleton<DeviceStreamServer>();

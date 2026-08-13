@@ -261,6 +261,18 @@ public sealed record DeviceProfile
 {
     public required DeviceId DeviceId { get; init; }
 
+    /// <summary>
+    /// Capture time of the newest item copied by the last backup, and where it went.
+    /// </summary>
+    /// <remarks>
+    /// A high-water mark rather than a comparison against the destination folder. Comparing against the
+    /// folder would re-copy everything the user has since moved, renamed or deliberately deleted from their
+    /// PC — which for a photo library is the opposite of helpful.
+    /// </remarks>
+    public DateTimeOffset? LastBackupAt { get; init; }
+
+    public string? LastBackupFolder { get; init; }
+
     public string? DisplayName { get; init; }
 
     public DateTimeOffset? LastConnected { get; init; }
