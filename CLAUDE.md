@@ -1,4 +1,4 @@
-# Android Explorer — conventions
+# Handspan — conventions
 
 Cross-platform (Windows + macOS) Avalonia desktop app that manages Android devices over
 ADB. Read `docs/plan/README.md` before starting work; `docs/notes.txt` is the product spec
@@ -18,7 +18,7 @@ These come from the spec and exist because breaking them causes specific, known 
    `exec:` over `shell:` entirely.
 5. **Every model and cache key carries `DeviceId`** (§39). Two phones must never share a
    cache entry.
-6. **No `#if WINDOWS` and no P/Invoke outside `src/AndroidExplorer.App/Platform/*`.**
+6. **No `#if WINDOWS` and no P/Invoke outside `src/Handspan.App/Platform/*`.**
    Platform behavior goes behind a Core interface with one implementation per OS.
 7. **Never pull a full-size image to draw a thumbnail** (§94). Use the tiered extraction in
    `docs/plan/04-gallery.md`.
@@ -32,25 +32,25 @@ These come from the spec and exist because breaking them causes specific, known 
 ## Layout
 
 ```
-src/AndroidExplorer.Core        models, interfaces, exceptions — zero platform deps
-src/AndroidExplorer.Adb         socket client, sync protocol, IDeviceFileSystem
-src/AndroidExplorer.Services    DeviceManager, TransferManager, Settings, Cache
-src/AndroidExplorer.Data        SQLite: dir cache, transfer journal, index
-src/AndroidExplorer.Media       thumbnails, decoding, streaming, metadata
-src/AndroidExplorer.Search      indexer, search, storage analysis
-src/AndroidExplorer.App         Avalonia UI + Platform/{Windows,MacOS}
-tests/*                         xUnit; FakeAdbServer lives in AndroidExplorer.Adb.Tests
+src/Handspan.Core        models, interfaces, exceptions — zero platform deps
+src/Handspan.Adb         socket client, sync protocol, IDeviceFileSystem
+src/Handspan.Services    DeviceManager, TransferManager, Settings, Cache
+src/Handspan.Data        SQLite: dir cache, transfer journal, index
+src/Handspan.Media       thumbnails, decoding, streaming, metadata
+src/Handspan.Search      indexer, search, storage analysis
+src/Handspan.App         Avalonia UI + Platform/{Windows,MacOS}
+tests/*                         xUnit; FakeAdbServer lives in Handspan.Adb.Tests
 companion/                      Android companion app (phase 7, Kotlin)
 ```
 
 Dependency direction is strictly downward: `App → Services → Adb → Core`. `Core` references
 nothing. **`Startup.cs` is the only file in `App` allowed to name a concrete type from a lower
 layer** — it is the composition root. Every other file in `App` depends solely on interfaces from
-`AndroidExplorer.Core`, reached through `IDeviceSession`.
+`Handspan.Core`, reached through `IDeviceSession`.
 
 ## Testing without a phone
 
-`FakeAdbServer` (in `tests/AndroidExplorer.Adb.Tests`) is a loopback TCP server that speaks
+`FakeAdbServer` (in `tests/Handspan.Adb.Tests`) is a loopback TCP server that speaks
 the real adb host + sync protocol against an in-memory filesystem, with injectable
 disconnects, failures, slow streams and feature downgrades. Most behavior — including
 resume — is testable with no hardware. Use it rather than mocking `IAdbClient`.

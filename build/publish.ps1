@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Publishes Android Explorer for one or more runtimes.
+    Publishes Handspan for one or more runtimes.
 
 .DESCRIPTION
     Produces self-contained, single-file builds so a user needs no .NET install (spec: phase 8).
@@ -25,7 +25,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$project = Join-Path $PSScriptRoot '../src/AndroidExplorer.App/AndroidExplorer.App.csproj'
+$project = Join-Path $PSScriptRoot '../src/Handspan.App/Handspan.App.csproj'
 $runtimes = if ($Runtime -eq 'all') { @('win-x64', 'win-arm64', 'osx-x64', 'osx-arm64') } else { @($Runtime) }
 
 foreach ($rid in $runtimes) {
@@ -74,7 +74,7 @@ if ($runtimes -contains 'osx-arm64' -or $runtimes -contains 'osx-x64') {
 
 Write-Host ''
 Write-Host 'Next steps, which cannot be automated here:' -ForegroundColor Yellow
-Write-Host '  Windows: sign AndroidExplorer.exe with an Authenticode certificate.'
+Write-Host '  Windows: sign Handspan.exe with an Authenticode certificate.'
 Write-Host '           Unsigned, SmartScreen will warn users away from a file-transfer tool.'
 Write-Host '  macOS:   run finish-macos-build.sh on the Mac to set the executable bit and ad-hoc sign.'
 Write-Host '           For anyone else to run it: codesign with a Developer ID, then notarize and staple.'

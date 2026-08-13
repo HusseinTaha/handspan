@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Handspan.App.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Handspan.App.Views.SearchView"
+             x:DataType="vm:SearchViewModel">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="16,12"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            BorderThickness="0,0,0,1">
+      <StackPanel Spacing="10">
+
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <TextBox Grid.Column="0" Text="{Binding Query}" PlaceholderText="Search this device…"
+                   FontSize="15" />
+          <Button Grid.Column="1" Content="Build index" Margin="8,0,0,0"
+                  Command="{Binding BuildIndexCommand}" IsEnabled="{Binding !IsIndexing}" />
+          <Button Grid.Column="2" Content="Stop" Margin="4,0,0,0"
+                  Command="{Binding CancelIndexCommand}" IsVisible="{Binding IsIndexing}" />
+        </Grid>
+
+        <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+
+        <!-- Filters (spec section 27) -->
+        <WrapPanel>
+          <CheckBox Content="Images" IsChecked="{Binding IncludeImages}" Margin="0,0,12,0" />
+          <CheckBox Content="Videos" IsChecked="{Binding IncludeVideos}" Margin="0,0,12,0" />
+          <CheckBox Content="Audio" IsChecked="{Binding IncludeAudio}" Margin="0,0,12,0" />
+          <CheckBox Content="Documents" IsChecked="{Binding IncludeDocuments}" Margin="0,0,20,0" />
+
+          <ComboBox SelectedIndex="{Binding SizeFilterIndex}" Width="150" Margin="0,0,8,0">
+            <ComboBoxItem Content="Any size" />
+            <ComboBoxItem Content="Under 10 MB" />
+            <ComboBoxItem Content="10 – 100 MB" />
+            <ComboBoxItem Content="Over 100 MB" />
+          </ComboBox>
+
+          <ComboBox SelectedIndex="{Binding DateFilterIndex}" Width="150">
+            <ComboBoxItem Content="Any date" />
+            <ComboBoxItem Content="Today" />
+            <ComboBoxItem Content="This week" />
+            <ComboBoxItem Content="This month" />
+          </ComboBox>
+        </WrapPanel>
+
+      </StackPanel>
+    </Border>
+
+    <ListBox ItemsSource="{Binding Results}" Background="Transparent" BorderThickness="0"
+             Padding="8">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:EntryRowViewModel">
+          <Grid ColumnDefinitions="26,*,100,150" Height="30">
+            <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding Path.Value}" FontSize="10" Opacity="0.55"
+                         TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <TextBlock Grid.Column="2" Text="{Binding SizeText}" VerticalAlignment="Center"
+                       HorizontalAlignment="Right" FontSize="12" Opacity="0.7" />
+            <TextBlock Grid.Column="3" Text="{Binding ModifiedText}" VerticalAlignment="Center"
+                       Margin="12,0,0,0" FontSize="12" Opacity="0.7" />
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+      <ListBox.Styles>
+        <Style Selector="ListBoxItem">
+          <Setter Property="Padding" Value="8,3" />
+          <Setter Property="MinHeight" Value="0" />
+        </Style>
+      </ListBox.Styles>
+    </ListBox>
+
+  </DockPanel>
+
+</UserControl>

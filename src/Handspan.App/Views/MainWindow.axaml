@@ -1,0 +1,101 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Handspan.App.ViewModels"
+        xmlns:views="using:Handspan.App.Views"
+        mc:Ignorable="d"
+        x:Class="Handspan.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Handspan"
+        Width="1180" Height="760"
+        MinWidth="880" MinHeight="560">
+
+  <DockPanel>
+
+    <!-- Status bar (spec section 82) -->
+    <Border DockPanel.Dock="Bottom" Padding="12,6"
+            Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding ConnectionSummary}" Opacity="0.75" FontSize="12"
+                   TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1" Text="Transfers: idle" Opacity="0.6" FontSize="12" />
+      </Grid>
+    </Border>
+
+    <!-- Navigation rail (spec section 83) -->
+    <Border DockPanel.Dock="Left" Width="188" Padding="10"
+            Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+      <StackPanel Spacing="4">
+        <TextBlock Text="HANDSPAN" FontSize="11" FontWeight="SemiBold"
+                   Opacity="0.6" Margin="6,4,0,12" />
+
+        <!-- Device switcher, shown only with more than one connected (spec section 39) -->
+        <StackPanel Spacing="2" Margin="0,0,0,10"
+                    IsVisible="{Binding HasMultipleDevices}">
+          <TextBlock Text="DEVICES" FontSize="10" FontWeight="SemiBold" Opacity="0.5"
+                     Margin="6,0,0,4" />
+          <ItemsControl ItemsSource="{Binding ConnectedSessions}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DeviceTabViewModel">
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Margin="0,1" Padding="10,6" BorderThickness="0"
+                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SwitchDeviceCommand}"
+                        CommandParameter="{Binding}">
+                  <Button.Styles>
+                    <!-- The active device is marked, so switching is unambiguous. -->
+                    <Style Selector="Button">
+                      <Setter Property="Background" Value="Transparent" />
+                    </Style>
+                  </Button.Styles>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="●" FontSize="10" VerticalAlignment="Center"
+                               IsVisible="{Binding IsActive}" />
+                    <TextBlock Text="{Binding DisplayName}" FontSize="12"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding ConnectionGlyph}" FontSize="9" Opacity="0.5"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding Pages}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:NavigationItem">
+              <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                      Margin="0,1" Padding="10,7"
+                      Background="Transparent" BorderThickness="0"
+                      IsEnabled="{Binding IsEnabled}"
+                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).NavigateCommand}"
+                      CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Title}" />
+                  <TextBlock Text="{Binding Hint}" FontSize="10" Opacity="0.5"
+                             VerticalAlignment="Center"
+                             IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+
+    <!-- Pages -->
+    <Panel>
+      <views:HomeView DataContext="{Binding Home}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsHomeVisible}" />
+      <views:ExplorerView DataContext="{Binding Explorer}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsExplorerVisible}" />
+      <views:TransfersView DataContext="{Binding Transfers}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsTransfersVisible}" />
+      <views:GalleryView DataContext="{Binding Gallery}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsGalleryVisible}" />
+      <views:SearchView DataContext="{Binding Search}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsSearchVisible}" />
+      <views:StorageView DataContext="{Binding Storage}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsStorageVisible}" />
+      <views:BackupView DataContext="{Binding Backup}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsBackupVisible}" />
+      <views:SettingsView DataContext="{Binding Settings}" IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsSettingsVisible}" />
+    </Panel>
+
+  </DockPanel>
+
+</Window>
+

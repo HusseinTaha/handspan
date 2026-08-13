@@ -1,4 +1,4 @@
-# Android Explorer
+# Handspan
 
 A desktop file manager and photo gallery for Android devices, over ADB — for **Windows and
 macOS**. Built to replace Windows' MTP interface (slow, flaky, poor file-operation semantics)
@@ -89,14 +89,13 @@ The app never attempts to bypass ADB authorization, and never asks for root.
 Requires only the **.NET 10 SDK** — no workloads, no Visual Studio, no Android SDK.
 
 ```sh
-dotnet build                                  # 11 projects
-dotnet test                                   # 340 tests
-dotnet run --project src/AndroidExplorer.App  # launch
+dotnet build                            # 11 projects
+dotnet test                             # 340 tests
+dotnet run --project src/Handspan.App   # launch
 ```
 
-The built executable is at
-`src/AndroidExplorer.App/bin/Debug/net10.0/AndroidExplorer.exe` (`AndroidExplorer` on macOS)
-and can be launched directly — faster than `dotnet run` after the first build.
+The built executable is at `src/Handspan.App/bin/Debug/net10.0/Handspan.exe` (`Handspan` on
+macOS) and can be launched directly — faster than `dotnet run` after the first build.
 
 ### Publishing
 
@@ -128,8 +127,8 @@ silently — or you can install it yourself:
 
 ### Application data
 
-Settings, the transfer journal, caches and logs live in `%LOCALAPPDATA%\AndroidExplorer` on
-Windows and `~/Library/Application Support/AndroidExplorer` on macOS. Deleting the folder
+Settings, the transfer journal, caches and logs live in `%LOCALAPPDATA%\Handspan` on
+Windows and `~/Library/Application Support/Handspan` on macOS. Deleting the folder
 resets the app completely.
 
 ## Requirements on the phone
@@ -183,7 +182,8 @@ hardware, a note in the issues is genuinely useful — the compatibility matrix 
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — how to work on it, including the rules that exist
   because breaking them caused specific bugs.
 - **docs/notes.txt** — the original 98-section product and technical specification, kept
-  verbatim. `§n` references throughout the docs point into it.
+  verbatim. `§n` references throughout the docs point into it. It predates the name, so it
+  still uses the working title "Android Explorer".
 
 ## Licence
 

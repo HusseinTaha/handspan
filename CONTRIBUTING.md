@@ -11,17 +11,17 @@ You need the **.NET 10 SDK** and nothing else. No workloads, no Visual Studio, n
 ```sh
 dotnet build
 dotnet test                                   # 340 tests, ~40 s
-dotnet run --project src/AndroidExplorer.App
+dotnet run --project src/Handspan.App
 ```
 
-A phone is **not** required. `FakeAdbServer` (in `tests/AndroidExplorer.Adb.Tests`) is a
+A phone is **not** required. `FakeAdbServer` (in `tests/Handspan.Adb.Tests`) is a
 loopback TCP server that speaks the real ADB host and sync protocol against an in-memory
 filesystem, with injectable disconnects, failures, slow streams and feature downgrades. Almost
 all behaviour — including resume — is testable with no hardware. Prefer it over mocking
 `IAdbClient`.
 
 If a phone *is* attached, the live tests run automatically. Set
-`ANDROIDEXPLORER_NO_DEVICE_TESTS=1` to skip them.
+`HANDSPAN_NO_DEVICE_TESTS=1` to skip them.
 
 Before opening a PR, also run the macOS cross-compile. It costs seconds and catches a
 Windows-only API leaking into shared code — a real run needs a Mac, but this catches the
@@ -34,13 +34,13 @@ dotnet build -r osx-arm64
 ## Layout
 
 ```
-src/AndroidExplorer.Core        models, interfaces, exceptions — zero platform deps
-src/AndroidExplorer.Adb         socket client, sync protocol, IDeviceFileSystem
-src/AndroidExplorer.Services    DeviceManager, TransferManager, Settings, Cache
-src/AndroidExplorer.Data        SQLite: dir cache, transfer journal, index
-src/AndroidExplorer.Media       thumbnails, decoding, streaming, metadata
-src/AndroidExplorer.Search      indexer, search, storage analysis
-src/AndroidExplorer.App         Avalonia UI + Platform/{Windows,MacOS}
+src/Handspan.Core        models, interfaces, exceptions — zero platform deps
+src/Handspan.Adb         socket client, sync protocol, IDeviceFileSystem
+src/Handspan.Services    DeviceManager, TransferManager, Settings, Cache
+src/Handspan.Data        SQLite: dir cache, transfer journal, index
+src/Handspan.Media       thumbnails, decoding, streaming, metadata
+src/Handspan.Search      indexer, search, storage analysis
+src/Handspan.App         Avalonia UI + Platform/{Windows,MacOS}
 tests/*                         xUnit
 ```
 
@@ -66,7 +66,7 @@ diagnosed bug. The full list with spec references is in [CLAUDE.md](CLAUDE.md).
 4. **All user input reaching a shell goes through `ShellQuote`.** Prefer `sync:` and `exec:`
    over `shell:` entirely.
 5. **Every model and cache key carries `DeviceId`.** Two phones must never share a cache entry.
-6. **No `#if WINDOWS` and no P/Invoke outside `src/AndroidExplorer.App/Platform/*`.** Platform
+6. **No `#if WINDOWS` and no P/Invoke outside `src/Handspan.App/Platform/*`.** Platform
    behaviour goes behind a Core interface with one implementation per OS.
 7. **Never pull a full-size image to draw a thumbnail.** Use the tiered extraction in
    `docs/plan/04-gallery.md`.

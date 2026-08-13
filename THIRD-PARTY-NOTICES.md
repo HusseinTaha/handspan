@@ -1,6 +1,6 @@
 # Third-party notices
 
-Android Explorer is distributed under the MIT License (see [LICENSE](LICENSE)). It also
+Handspan is distributed under the MIT License (see [LICENSE](LICENSE)). It also
 includes, or links against, the third-party components listed below. Every one of them is
 under a permissive licence — **there is no copyleft component in this product**, and nothing
 here restricts commercial use or requires derivative works to be published.
@@ -83,7 +83,7 @@ GPL option exists — and it is only an *option*:
 
 ## Android Debug Bridge (`adb`)
 
-Not part of this repository and **not redistributed** by it. Android Explorer locates an
+Not part of this repository and **not redistributed** by it. Handspan locates an
 existing `adb` on the machine, or — only with explicit user consent — downloads Google's
 official `platform-tools` archive at runtime into the user's own application data folder.
 Google's platform-tools are licensed under the **Apache License 2.0**.
@@ -92,7 +92,7 @@ Google's platform-tools are licensed under the **Apache License 2.0**.
 > Apache 2.0 licence text alongside it. Downloading on the user's behalf, as the app does
 > today, does not create a redistribution obligation.
 
-Android Explorer speaks the documented ADB **host and sync protocol** over a local TCP
+Handspan speaks the documented ADB **host and sync protocol** over a local TCP
 socket. It contains no Android Open Source Project code, and it does not attempt to
 circumvent ADB authorization, device encryption, or any other part of Android's security
 model.
@@ -104,7 +104,7 @@ Not shipped, listed for completeness: xunit 2.9.3 and xunit.runner.visualstudio 
 
 ## Trademarks
 
-Android is a trademark of Google LLC. Android Explorer is an independent project with no
+Android is a trademark of Google LLC. Handspan is an independent project with no
 affiliation with, endorsement by, or sponsorship from Google.
 
 ---

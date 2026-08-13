@@ -1,0 +1,125 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Handspan.App.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Handspan.App.Views.HomeView"
+             x:DataType="vm:HomeViewModel">
+
+  <ScrollViewer Padding="32">
+    <StackPanel Spacing="20" MaxWidth="780" HorizontalAlignment="Left">
+
+      <TextBlock Text="Handspan" FontSize="30" FontWeight="Light" />
+
+      <!-- Devices (spec section 6, 84) -->
+      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="18">
+        <StackPanel Spacing="12">
+
+          <TextBlock Text="Devices" FontWeight="SemiBold" />
+
+          <!-- Walkthrough shown when nothing is connected (spec section 84) -->
+          <StackPanel Spacing="9" IsVisible="{Binding !HasDevices}">
+            <TextBlock Text="Connect your Android device" FontSize="16" />
+            <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                       Text="1.  Settings → About phone → tap Build number seven times to unlock Developer options. On Samsung it is under About phone → Software information." />
+            <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                       Text="2.  Settings → Developer options → turn on USB debugging." />
+            <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                       Text="3.  Connect the USB cable, then tap Allow on the prompt on the phone." />
+            <TextBlock TextWrapping="Wrap" FontSize="12" Opacity="0.6"
+                       Text="Detection is automatic — the device appears here a second or two after being plugged in." />
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding ConnectedDevices}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DeviceRowViewModel">
+                <Border Margin="0,4" Padding="16" CornerRadius="6"
+                        Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+                  <StackPanel Spacing="7">
+
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
+                                 FontSize="18" FontWeight="SemiBold" />
+                      <Border Grid.Column="1" CornerRadius="10" Padding="10,3"
+                              Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                        <TextBlock Text="{Binding StateText}" FontSize="12" />
+                      </Border>
+                    </Grid>
+
+                    <TextBlock Text="{Binding Details}" Opacity="0.75" FontSize="13" />
+
+                    <StackPanel Spacing="4"
+                                IsVisible="{Binding StorageText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                      <ProgressBar Value="{Binding StorageUsedFraction}" Maximum="100" Height="6" />
+                      <TextBlock Text="{Binding StorageText}" Opacity="0.75" FontSize="12" />
+                    </StackPanel>
+
+                    <SelectableTextBlock Text="{Binding Serial}" Opacity="0.5" FontSize="11"
+                                         FontFamily="Consolas,Menlo,monospace" />
+
+                    <!-- Authorization is guided, never bypassed (spec section 41) -->
+                    <Border CornerRadius="4" Padding="12" Margin="0,4,0,0"
+                            IsVisible="{Binding NeedsAuthorization}"
+                            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                      <TextBlock Text="{Binding Guidance}" TextWrapping="Wrap" FontSize="13" />
+                    </Border>
+
+                    <TextBlock Text="{Binding Guidance}" TextWrapping="Wrap" FontSize="13" Opacity="0.75"
+                               IsVisible="{Binding IsUsable}" />
+
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+        </StackPanel>
+      </Border>
+
+      <!-- Connection / environment -->
+      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="18">
+        <StackPanel Spacing="14">
+          <TextBlock Text="Connection" FontWeight="SemiBold" />
+
+          <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Platform" Opacity="0.7" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Platform}" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text=".NET runtime" Opacity="0.7" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RuntimeVersion}" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="adb" Opacity="0.7" />
+            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="{Binding AdbStatus}" TextWrapping="Wrap" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="App data" Opacity="0.7" />
+            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AppDataFolder}" TextWrapping="Wrap" />
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Downloads" Opacity="0.7" />
+            <SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="{Binding DownloadFolder}" TextWrapping="Wrap" />
+          </Grid>
+
+          <StackPanel Spacing="6" IsVisible="{Binding IsDownloadingAdb}">
+            <ProgressBar Value="{Binding DownloadProgress}" Maximum="100" Height="6" />
+            <TextBlock Text="Downloading platform-tools…" FontSize="12" Opacity="0.7" />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Re-check adb" Command="{Binding DetectAdbCommand}" IsEnabled="{Binding !IsBusy}" />
+            <Button Content="Download adb" Command="{Binding DownloadAdbCommand}"
+                    IsEnabled="{Binding !IsAdbFound}" />
+            <Button Content="Restart ADB" Command="{Binding RestartAdbCommand}" IsEnabled="{Binding !IsBusy}" />
+            <Button Content="Open app data folder" Command="{Binding OpenAppDataFolderCommand}" />
+          </StackPanel>
+
+          <TextBlock FontSize="11" Opacity="0.55" TextWrapping="Wrap"
+                     Text="Downloading fetches Google's platform-tools. Nothing is downloaded without this action, and the app works offline afterwards." />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

@@ -7,7 +7,7 @@ binary only to launch the server. We never touch the USB wire protocol — that 
 job, which is what §98's warning is actually about.
 
 ```
-AndroidExplorer  --TCP 127.0.0.1:5037-->  adb server  --USB-->  device
+Handspan  --TCP 127.0.0.1:5037-->  adb server  --USB-->  device
 ```
 
 ## 1.1 Server management (§72)
@@ -160,7 +160,7 @@ layouts were validated against Google's own ADB server rather than against a fak
 which is strictly stronger evidence, because a fake would agree with our own misreading of the
 protocol.
 
-`tests/AndroidExplorer.Adb.Tests/RealAdbServerTests.cs` runs the transport against the live server and
+`tests/Handspan.Adb.Tests/RealAdbServerTests.cs` runs the transport against the live server and
 compares its answers with the adb CLI's, skipping cleanly when no device or binary is present.
 Confirmed so far: protocol version negotiation, `host:devices-l` parsing **matching the CLI exactly**,
 `host:track-devices` pushing an immediate snapshot, and an unauthorized device surfacing as
@@ -173,7 +173,7 @@ garbage rather than an error — so they are the tests that matter most.
 
 ## 1.8 `FakeAdbServer` — still worth building
 
-A loopback TCP server in `tests/AndroidExplorer.Adb.Tests` that speaks the real host + sync
+A loopback TCP server in `tests/Handspan.Adb.Tests` that speaks the real host + sync
 protocol against an in-memory filesystem, with injectable faults:
 
 - drop the connection after N bytes (cable pull)

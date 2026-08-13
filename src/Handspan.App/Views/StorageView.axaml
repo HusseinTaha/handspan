@@ -1,0 +1,146 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Handspan.App.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Handspan.App.Views.StorageView"
+             x:DataType="vm:StorageViewModel">
+
+  <Panel>
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="16,12"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="0" Spacing="2">
+          <TextBlock Text="Storage" FontSize="20" FontWeight="Light" />
+          <TextBlock Text="{Binding VolumeSummary}" FontSize="12" Opacity="0.75" />
+          <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.6" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Content="Refresh" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
+          <Button Content="Cancel" Command="{Binding CancelCommand}" IsVisible="{Binding IsBusy}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <ScrollViewer Padding="16">
+      <StackPanel Spacing="20">
+
+        <!-- Category breakdown (spec section 62) -->
+        <StackPanel Spacing="10" IsVisible="{Binding HasCategories}">
+          <TextBlock Text="WHAT IS USING SPACE" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
+          <ItemsControl ItemsSource="{Binding Categories}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:StorageCategoryViewModel">
+                <Grid ColumnDefinitions="120,*,110" Margin="0,4">
+                  <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center" />
+                  <ProgressBar Grid.Column="1" Value="{Binding BarPercent}" Maximum="100" Height="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SizeText}" FontSize="12" />
+                    <TextBlock Text="{Binding CountText}" FontSize="10" Opacity="0.6" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="{Binding UnaccountedSummary}" FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                     IsVisible="{Binding UnaccountedSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <!-- Duplicates (spec section 61) -->
+        <StackPanel Spacing="10">
+          <TextBlock Text="DUPLICATES" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Content="Find duplicates" Command="{Binding FindDuplicatesCommand}"
+                    IsEnabled="{Binding !IsBusy}" />
+            <CheckBox Content="Verify with full hashes (slower)"
+                      IsChecked="{Binding VerifyDuplicatesWithHash}" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Text="{Binding DuplicateSummary}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+
+          <ItemsControl ItemsSource="{Binding Duplicates}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DuplicateGroupViewModel">
+                <Border Margin="0,3" Padding="12,10" CornerRadius="6"
+                        Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding Header}" FontWeight="SemiBold" FontSize="13" />
+                    <TextBlock Text="{Binding ConfidenceText}" FontSize="11" Opacity="0.65" />
+                    <ItemsControl ItemsSource="{Binding Paths}" Margin="0,4,0,0">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                          <SelectableTextBlock Text="{Binding}" FontSize="11" Opacity="0.8"
+                                               FontFamily="Consolas,Menlo,monospace"
+                                               TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Acting on the finding is the point of finding it (spec section 61) -->
+                    <Button Content="Delete extra copies, keep the first" FontSize="11"
+                            HorizontalAlignment="Left" Margin="0,4,0,0"
+                            Command="{Binding $parent[ItemsControl].((vm:StorageViewModel)DataContext).DeleteDuplicatesCommand}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Largest files (spec section 63) -->
+        <StackPanel Spacing="8" IsVisible="{Binding LargestFiles.Count}">
+          <TextBlock Text="LARGEST FILES" FontSize="11" FontWeight="SemiBold" Opacity="0.6" />
+          <ItemsControl ItemsSource="{Binding LargestFiles}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:EntryRowViewModel">
+                <Grid ColumnDefinitions="26,*,110,Auto" Margin="0,2">
+                  <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontSize="13" />
+                    <TextBlock Text="{Binding Path.Value}" FontSize="10" Opacity="0.55"
+                               TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Text="{Binding SizeText}" VerticalAlignment="Center"
+                             HorizontalAlignment="Right" FontSize="12" />
+                  <Button Grid.Column="3" Content="Delete" FontSize="11" Margin="10,0,0,0"
+                          Command="{Binding $parent[ItemsControl].((vm:StorageViewModel)DataContext).DeleteFileCommand}"
+                          CommandParameter="{Binding}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+      </StackPanel>
+    </ScrollViewer>
+
+  </DockPanel>
+
+  <!-- Deletion is permanent, so every one is confirmed (spec section 51) -->
+  <Border IsVisible="{Binding IsConfirmOpen}" Background="#80000000">
+    <Border VerticalAlignment="Center" HorizontalAlignment="Center" Width="520" Padding="20"
+            CornerRadius="8"
+            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            BorderThickness="1">
+      <StackPanel Spacing="12">
+        <SelectableTextBlock Text="{Binding ConfirmMessage}" TextWrapping="Wrap" FontSize="13" />
+        <TextBlock FontSize="11" Opacity="0.7" TextWrapping="Wrap"
+                   Text="This cannot be undone. Android has no recycle bin, so deleted files are not recoverable from here." />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="Cancel" Command="{Binding CancelConfirmCommand}" IsCancel="True" />
+          <Button Content="Delete" Command="{Binding ConfirmActionCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+  </Border>
+
+  </Panel>
+
+</UserControl>

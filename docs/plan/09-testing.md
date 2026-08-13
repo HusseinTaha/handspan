@@ -7,7 +7,7 @@ way real hardware never is.
 
 ## `FakeAdbServer` — the backbone
 
-A loopback TCP server (in `tests/AndroidExplorer.Adb.Tests`) speaking the **real** adb host +
+A loopback TCP server (in `tests/Handspan.Adb.Tests`) speaking the **real** adb host +
 sync protocol against an in-memory filesystem. Prefer it over mocking `IAdbClient`: mocks
 verify that we called what we intended, while `FakeAdbServer` verifies the bytes on the wire
 are actually correct — which is where protocol bugs live.

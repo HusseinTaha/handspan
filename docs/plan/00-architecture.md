@@ -12,7 +12,7 @@ UI (Avalonia)  →  Application Services  →  Virtual Device FS  →  ADB backe
 ```
 
 Dependency direction is strictly downward: `App → Services → Adb → Core`. `Core` references
-nothing. **The UI must never reference `AndroidExplorer.Adb`**; it reaches everything through
+nothing. **The UI must never reference `Handspan.Adb`**; it reaches everything through
 interfaces hanging off `DeviceSession`.
 
 ## Decisions
@@ -52,18 +52,18 @@ obligations in [04-gallery.md](04-gallery.md#46-licensing--decided-bundle-lgpl-d
 ## Solution layout
 
 ```
-AndroidExplorer.sln
-src/AndroidExplorer.Core        models, interfaces, exceptions — zero platform deps
-src/AndroidExplorer.Adb         socket client, sync protocol, IDeviceFileSystem impl
-src/AndroidExplorer.Services    DeviceManager, TransferManager, Settings, Cache
-src/AndroidExplorer.Data        SQLite: dir cache, transfer journal, file/media index
-src/AndroidExplorer.Media       thumbnails, decoding, streaming, metadata (phase 4)
-src/AndroidExplorer.Search      indexer, search, storage analysis (phase 5)
-src/AndroidExplorer.App         Avalonia: Views/ViewModels/Controls/Platform
-tests/AndroidExplorer.Adb.Tests         FakeAdbServer + protocol tests
-tests/AndroidExplorer.Core.Tests
-tests/AndroidExplorer.Services.Tests
-tests/AndroidExplorer.Media.Tests
+Handspan.sln
+src/Handspan.Core        models, interfaces, exceptions — zero platform deps
+src/Handspan.Adb         socket client, sync protocol, IDeviceFileSystem impl
+src/Handspan.Services    DeviceManager, TransferManager, Settings, Cache
+src/Handspan.Data        SQLite: dir cache, transfer journal, file/media index
+src/Handspan.Media       thumbnails, decoding, streaming, metadata (phase 4)
+src/Handspan.Search      indexer, search, storage analysis (phase 5)
+src/Handspan.App         Avalonia: Views/ViewModels/Controls/Platform
+tests/Handspan.Adb.Tests         FakeAdbServer + protocol tests
+tests/Handspan.Core.Tests
+tests/Handspan.Services.Tests
+tests/Handspan.Media.Tests
 companion/                      Android companion app (phase 7, Kotlin/Gradle)
 tools/platform-tools/           bundled adb, gitignored
 ```
@@ -91,7 +91,7 @@ the directory cache (phase 2), transfer journal (phase 3) and search index (phas
 ## Cross-platform discipline
 
 The rule that keeps macOS cheap: **no `#if WINDOWS`, no P/Invoke outside
-`src/AndroidExplorer.App/Platform/{Windows,MacOS}`.** Platform behavior lives behind
+`src/Handspan.App/Platform/{Windows,MacOS}`.** Platform behavior lives behind
 Core-declared interfaces with one implementation per OS:
 
 | Interface | Windows | macOS |

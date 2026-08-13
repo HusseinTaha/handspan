@@ -126,7 +126,7 @@ plumbing; the same overlays serve delete confirmation (§51).
 
 ## Phase 2 exit criteria
 
-Verified by tests (16 cache tests, `tests/AndroidExplorer.Services.Tests/DirectoryCacheTests.cs`):
+Verified by tests (16 cache tests, `tests/Handspan.Services.Tests/DirectoryCacheTests.cs`):
 
 - [x] A never-cached folder returns **null**, an empty folder returns **empty** — the distinction
       that decides whether the device gets read.

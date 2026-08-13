@@ -13,7 +13,9 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 publish/
-*.app/
+# NOT "*.app/" — gitignore matching is case-insensitive on Windows and macOS, so that pattern
+# also matched the src/Handspan.App/ project directory and silently excluded the entire UI
+# project from the repository. Bundles are produced under artifacts/, already ignored above.
 TestResults/
 *.trx
 *.coverage
@@ -28,7 +30,7 @@ BenchmarkDotNet.Artifacts/
 *.swp
 *~
 
-## Android Explorer specific
+## Handspan specific
 # Bundled adb: fetched at build/first-run, never committed (Apache-2.0, ~10 MB)
 tools/platform-tools/
 # Bundled LGPL media binaries: fetched by script, never committed

@@ -1,7 +1,7 @@
 # Phase 3 — File operations and the Transfer Manager
 
 §97 phase 3, plus §9–§13 and §31–§37. **This phase is the one that makes the product useful**
-— at the end of it, Android Explorer replaces MTP for daily work.
+— at the end of it, Handspan replaces MTP for daily work.
 
 The transfer manager is what §11 calls "one of the most important components", and resume
 (§13) is the feature the `adb` CLI fundamentally cannot provide, which is why phase 1 built

@@ -12,7 +12,7 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   # Runners ship an adb of their own but never a phone. Without this the live tests would
   # start a real adb daemon on the runner to prove nothing. See AdbTestEnvironment.
-  ANDROIDEXPLORER_NO_DEVICE_TESTS: 1
+  HANDSPAN_NO_DEVICE_TESTS: 1
 
 jobs:
   test:
@@ -60,7 +60,7 @@ jobs:
       # but this catches the common mistake, and it proves all four shipping targets build.
       - name: Publish ${{ matrix.rid }}
         run: >
-          dotnet publish src/AndroidExplorer.App/AndroidExplorer.App.csproj
+          dotnet publish src/Handspan.App/Handspan.App.csproj
           --configuration Release
           --runtime ${{ matrix.rid }}
           --self-contained true
@@ -71,6 +71,6 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: AndroidExplorer-${{ matrix.rid }}
+          name: Handspan-${{ matrix.rid }}
           path: artifacts/${{ matrix.rid }}
           retention-days: 7

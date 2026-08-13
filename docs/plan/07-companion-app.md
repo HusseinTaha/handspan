@@ -34,11 +34,11 @@ Windows/macOS app  ──host:forward──▶ adb server ──USB──▶ com
 
 - Kotlin app exposing a `LocalServerSocket` on the **abstract** namespace (no listening TCP
   port on the phone, so nothing is exposed to the network).
-- Desktop side requests `host:forward:tcp:<local>;localabstract:androidexplorer` and speaks a
+- Desktop side requests `host:forward:tcp:<local>;localabstract:handspan` and speaks a
   length-prefixed protocol over it — protobuf preferred over JSON for the media list, since
   50,000 items is where JSON parsing starts to cost real time.
 - Installed via `adb install` **with explicit user consent** and a plain explanation of what it
-  does and what it can access. Uninstallable from within Android Explorer.
+  does and what it can access. Uninstallable from within Handspan.
 - Version handshake on connect; a mismatched companion is ignored rather than trusted.
 
 ## Capabilities provided

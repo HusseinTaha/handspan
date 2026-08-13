@@ -11,7 +11,7 @@
 param(
     [Parameter(Mandatory)][string]$PublishDir,
     [string]$Version = '0.1.0',
-    [string]$AppName = 'Android Explorer',
+    [string]$AppName = 'Handspan',
 
     # Distinguishes the two architectures. Without it both bundles land on the same path and the
     # second silently overwrites the first — which is exactly what happened the first time.
@@ -45,7 +45,7 @@ $plist = @"
     <key>CFBundleDisplayName</key>
     <string>$AppName</string>
     <key>CFBundleIdentifier</key>
-    <string>com.androidexplorer.app</string>
+    <string>com.handspan.app</string>
     <key>CFBundleVersion</key>
     <string>$Version</string>
     <key>CFBundleShortVersionString</key>
@@ -53,7 +53,7 @@ $plist = @"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
-    <string>AndroidExplorer</string>
+    <string>Handspan</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
@@ -61,7 +61,7 @@ $plist = @"
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>Android Explorer</string>
+    <string>Handspan</string>
 </dict>
 </plist>
 "@
@@ -72,13 +72,13 @@ Set-Content -Path (Join-Path $contents 'Info.plist') -Value $plist -Encoding utf
 # not launch until this is run on the Mac. Shipping the script beside it removes the guesswork.
 $finish = @'
 #!/bin/sh
-# Prepares an Android Explorer bundle that was built on Windows.
-#   ./finish-macos-build.sh "Android Explorer (Apple Silicon).app"
-#   ./finish-macos-build.sh "Android Explorer (Intel).app"
+# Prepares an Handspan bundle that was built on Windows.
+#   ./finish-macos-build.sh "Handspan (Apple Silicon).app"
+#   ./finish-macos-build.sh "Handspan (Intel).app"
 set -e
 
-BUNDLE="${1:-Android Explorer.app}"
-BINARY="$BUNDLE/Contents/MacOS/AndroidExplorer"
+BUNDLE="${1:-Handspan.app}"
+BINARY="$BUNDLE/Contents/MacOS/Handspan"
 
 if [ ! -d "$BUNDLE" ]; then
   echo "No such bundle: $BUNDLE" >&2

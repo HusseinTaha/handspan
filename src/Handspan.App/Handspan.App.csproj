@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Handspan.App</RootNamespace>
+    <AssemblyName>Handspan</AssemblyName>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    Keep native debug symbols out of published builds. SkiaSharp and HarfBuzz ship .pdb files totalling
+    ~105 MB — larger than the application itself — and they are useless to anyone running it. They arrive as
+    native runtime assets, which AllowedReferenceRelatedFileExtensions does not cover, so they have to be
+    removed from the publish list directly.
+  -->
+  <Target Name="RemoveNativeSymbolsFromPublish"
+          AfterTargets="ComputeResolvedFilesToPublishList"
+          Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/**" />
+  </ItemGroup>
+
+  <!--
+    The composition root is internal, and the test that validates it must call the real thing rather than a
+    copy of the registration list — a copy drifts, and the drift is exactly what breaks launch.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Handspan.Services.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Handspan.Core\Handspan.Core.csproj" />
+    <ProjectReference Include="..\Handspan.Services\Handspan.Services.csproj" />
+    <ProjectReference Include="..\Handspan.Adb\Handspan.Adb.csproj" />
+    <ProjectReference Include="..\Handspan.Data\Handspan.Data.csproj" />
+    <ProjectReference Include="..\Handspan.Media\Handspan.Media.csproj" />
+    <ProjectReference Include="..\Handspan.Search\Handspan.Search.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Win32.SystemEvents" Version="10.0.11" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+</Project>

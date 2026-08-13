@@ -1,0 +1,145 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Handspan.App.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Handspan.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <ScrollViewer Padding="24">
+    <StackPanel Spacing="18" MaxWidth="700" HorizontalAlignment="Left">
+
+      <StackPanel Spacing="4">
+        <TextBlock Text="Settings" FontSize="20" FontWeight="Light" />
+        <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.7" />
+      </StackPanel>
+
+      <!-- General (spec section 50) -->
+      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Text="General" FontWeight="SemiBold" />
+          <StackPanel Spacing="4">
+            <TextBlock Text="Default download folder" FontSize="12" Opacity="0.7" />
+            <TextBox Text="{Binding DownloadFolder}" />
+          </StackPanel>
+          <CheckBox Content="Confirm before deleting" IsChecked="{Binding ConfirmDeletes}" />
+          <CheckBox Content="Confirm large transfers" IsChecked="{Binding ConfirmLargeTransfers}" />
+          <CheckBox Content="Show hidden files" IsChecked="{Binding ShowHiddenFiles}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Transfers (spec section 12, 37) -->
+      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Transfers" FontWeight="SemiBold" />
+
+          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Parallel small files" VerticalAlignment="Center"
+                       Opacity="0.8" />
+            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding MaxSmallTransfers}"
+                           Minimum="1" Maximum="16" Increment="1" FormatString="0" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Parallel large files" VerticalAlignment="Center"
+                       Opacity="0.8" />
+            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding MaxLargeTransfers}"
+                           Minimum="1" Maximum="8" Increment="1" FormatString="0" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Automatic retries" VerticalAlignment="Center"
+                       Opacity="0.8" />
+            <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding RetryCount}"
+                           Minimum="0" Maximum="10" Increment="1" FormatString="0" />
+          </Grid>
+
+          <CheckBox Content="Verify transfers with SHA-256 (slower)" IsChecked="{Binding VerifyWithHash}" />
+          <TextBlock FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                     Text="Sizes are always checked. Hashing is thorough but expensive over USB, so it is off by default. More parallel transfers is not automatically faster — USB is usually the limit." />
+        </StackPanel>
+      </Border>
+
+      <!-- Gallery (spec section 21) -->
+      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Gallery" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Thumbnail size (pixels)"
+                       VerticalAlignment="Center" Opacity="0.8" />
+            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding ThumbnailSize}"
+                           Minimum="64" Maximum="1024" Increment="32" FormatString="0" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Thumbnail cache cap (MB)"
+                       VerticalAlignment="Center" Opacity="0.8" />
+            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding ThumbnailCacheCapMegabytes}"
+                           Minimum="64" Maximum="20480" Increment="256" FormatString="0" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Connection and wireless (spec section 40) -->
+      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Connection" FontWeight="SemiBold" />
+
+          <StackPanel Spacing="4">
+            <TextBlock Text="adb location (leave blank to search automatically)" FontSize="12"
+                       Opacity="0.7" />
+            <TextBox Text="{Binding AdbPath}" />
+          </StackPanel>
+
+          <CheckBox Content="Allow wireless ADB" IsChecked="{Binding AllowWirelessAdb}" />
+          <TextBlock FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                     Text="USB is faster and more predictable for large transfers, so wireless is off by default. Wireless debugging needs Android 11 or newer." />
+
+          <StackPanel Spacing="8" IsVisible="{Binding AllowWirelessAdb}" Margin="0,4,0,0">
+            <TextBlock Text="On the phone: Developer options → Wireless debugging → Pair device with pairing code."
+                       FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+
+            <Grid ColumnDefinitions="*,110,110" ColumnSpacing="8">
+              <TextBox Grid.Column="0" Text="{Binding PairAddress}" PlaceholderText="IP address" />
+              <TextBox Grid.Column="1" Text="{Binding PairPort}" PlaceholderText="Pair port" />
+              <TextBox Grid.Column="2" Text="{Binding PairCode}" PlaceholderText="Code" />
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Pair" Command="{Binding PairCommand}" IsEnabled="{Binding !IsBusy}" />
+              <TextBox Text="{Binding ConnectPort}" PlaceholderText="Connect port" Width="110" />
+              <Button Content="Connect" Command="{Binding ConnectWirelessCommand}"
+                      IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding WirelessStatus}" FontSize="12" Opacity="0.8" TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Diagnostics (spec section 49) -->
+      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Diagnostics" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Restart ADB" Command="{Binding RestartAdbCommand}"
+                    IsEnabled="{Binding !IsBusy}" />
+            <Button Content="Rescan devices" Command="{Binding RescanDevicesCommand}"
+                    IsEnabled="{Binding !IsBusy}" />
+            <Button Content="Open logs" Command="{Binding OpenLogsCommand}" />
+          </StackPanel>
+          <CheckBox Content="Verbose diagnostics" IsChecked="{Binding VerboseDiagnostics}" />
+          <TextBlock FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                     Text="Verbose logging records file paths and names to help diagnose problems. It is off by default because those are private." />
+        </StackPanel>
+      </Border>
+
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Save" Command="{Binding SaveCommand}" />
+        <Button Content="Reset to defaults" Command="{Binding ResetCommand}" />
+      </StackPanel>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

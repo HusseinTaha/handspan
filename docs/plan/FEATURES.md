@@ -88,7 +88,7 @@ notarization, DMG · bundled or downloaded platform-tools · optional auto-updat
 | Not doing | Why |
 |---|---|
 | MTP fallback | Windows-only, and macOS has no MTP stack at all. Revisit only if real users need non-debuggable phones (§98 keeps the FS API transport-neutral so it stays possible) |
-| Windows shell namespace ("This PC → Android Explorer") | Explicitly out of MVP (§88); the standalone app comes first |
+| Windows shell namespace ("This PC → Handspan") | Explicitly out of MVP (§88); the standalone app comes first |
 | Root access / bypassing ADB authorization | Never (§17, §41, §78) |
 | Device-side recycle bin | Not in v1 — permanent delete with confirmation. It consumes phone storage and needs careful design (§51) |
 | Cloud sync, telemetry, automatic media upload | Against the privacy policy (§42, §43) |

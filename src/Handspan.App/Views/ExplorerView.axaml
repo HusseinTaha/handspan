@@ -1,0 +1,393 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Handspan.App.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Handspan.App.Views.ExplorerView"
+             x:DataType="vm:ExplorerViewModel"
+             DragDrop.AllowDrop="True">
+
+  <!-- Windows-standard shortcuts (spec section 87) -->
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="F5" Command="{Binding RefreshCommand}" />
+    <KeyBinding Gesture="F2" Command="{Binding RenameCommand}" CommandParameter="{Binding SelectedEntry}" />
+    <KeyBinding Gesture="Delete" Command="{Binding DeleteCommand}" CommandParameter="{Binding SelectedEntry}" />
+    <KeyBinding Gesture="Alt+Left" Command="{Binding GoBackCommand}" />
+    <KeyBinding Gesture="Alt+Right" Command="{Binding GoForwardCommand}" />
+    <KeyBinding Gesture="Alt+Up" Command="{Binding GoUpCommand}" />
+    <KeyBinding Gesture="Back" Command="{Binding GoUpCommand}" />
+    <!-- Ctrl+C copies the selection to this computer, matching the gallery (spec section 87) -->
+    <KeyBinding Gesture="Ctrl+C" Command="{Binding DownloadSelectedCommand}" />
+  </UserControl.KeyBindings>
+
+  <Panel>
+    <DockPanel>
+
+      <!-- Toolbar: navigation + address bar (spec section 7, 30) -->
+      <Border DockPanel.Dock="Top" Padding="12,10"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="0,0,0,1">
+        <StackPanel Spacing="10">
+
+          <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto">
+            <Button Grid.Column="0" Content="←" Width="34" ToolTip.Tip="Back (Alt+Left)"
+                    Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}" />
+            <Button Grid.Column="1" Content="→" Width="34" Margin="4,0" ToolTip.Tip="Forward (Alt+Right)"
+                    Command="{Binding GoForwardCommand}" IsEnabled="{Binding CanGoForward}" />
+            <Button Grid.Column="2" Content="↑" Width="34" ToolTip.Tip="Up (Alt+Up)"
+                    Command="{Binding GoUpCommand}" IsEnabled="{Binding CanGoUp}" />
+
+            <TextBox Grid.Column="3" Margin="8,0" Text="{Binding PathText}"
+                     ToolTip.Tip="Android path — press Enter to go there">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding GoToPathCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+
+            <Button Grid.Column="4" Content="Refresh" Command="{Binding RefreshCommand}"
+                    ToolTip.Tip="Refresh (F5)" />
+
+            <Button Grid.Column="5" Content="New folder" Margin="4,0,0,0"
+                    Command="{Binding NewFolderCommand}" />
+
+            <!-- Upload into the folder on screen (spec section 9) -->
+            <SplitButton Grid.Column="6" Content="Upload" Margin="4,0,0,0"
+                         Click="OnUploadFilesClick"
+                         ToolTip.Tip="Copy files from this computer into the current folder">
+              <SplitButton.Flyout>
+                <MenuFlyout>
+                  <MenuItem Header="Files…" Click="OnUploadFilesClick" />
+                  <MenuItem Header="Folder…" Click="OnUploadFolderClick" />
+                </MenuFlyout>
+              </SplitButton.Flyout>
+            </SplitButton>
+
+            <!-- Downloads the whole selection, folders included (spec section 31) -->
+            <Button Grid.Column="7" Content="Download" Margin="4,0,0,0"
+                    Command="{Binding DownloadSelectedCommand}"
+                    IsEnabled="{Binding HasAnySelection}"
+                    ToolTip.Tip="Copy the selected files and folders to this computer" />
+
+            <!-- Pin the folder on screen to Quick Access (spec section 65) -->
+            <Button Grid.Column="8" Margin="4,0,0,0" Command="{Binding ToggleFavoriteCommand}"
+                    ToolTip.Tip="Pin or unpin this folder">
+              <TextBlock Text="★" FontSize="14">
+                <TextBlock.Styles>
+                  <!-- Filled when pinned, faint when not, so the state reads at a glance. -->
+                  <Style Selector="TextBlock">
+                    <Setter Property="Opacity" Value="0.35" />
+                  </Style>
+                </TextBlock.Styles>
+              </TextBlock>
+            </Button>
+          </Grid>
+
+          <!-- Selection bar, shown once anything is selected (spec section 31, 34) -->
+          <Border IsVisible="{Binding HasAnySelection}" CornerRadius="4" Padding="10,6"
+                  Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="{Binding SelectionSummary}" VerticalAlignment="Center"
+                         FontSize="12" FontWeight="SemiBold" />
+              <TextBlock Grid.Column="1" FontSize="11" Opacity="0.6" VerticalAlignment="Center"
+                         Text="Folder structure is recreated on this computer" />
+            </Grid>
+          </Border>
+
+          <!-- Breadcrumbs (spec section 30) -->
+          <ItemsControl ItemsSource="{Binding Breadcrumbs}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:BreadcrumbViewModel">
+                <StackPanel Orientation="Horizontal">
+                  <Button Content="{Binding Label}" Padding="6,2" Background="Transparent"
+                          BorderThickness="0"
+                          Command="{Binding $parent[UserControl].((vm:ExplorerViewModel)DataContext).NavigateToBreadcrumbCommand}"
+                          CommandParameter="{Binding}" />
+                  <TextBlock Text="›" Opacity="0.5" VerticalAlignment="Center"
+                             IsVisible="{Binding !IsLast}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+        </StackPanel>
+      </Border>
+
+      <!-- Status bar -->
+      <Border DockPanel.Dock="Bottom" Padding="12,6">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <TextBlock Grid.Column="0" Text="{Binding StatusText}" FontSize="12" Opacity="0.7" />
+          <TextBlock Grid.Column="1" Text="cached" FontSize="11" Opacity="0.5" Margin="8,0"
+                     ToolTip.Tip="Showing a cached listing while the device is re-read"
+                     IsVisible="{Binding IsFromCache}" />
+          <CheckBox Grid.Column="2" Content="Hidden files" FontSize="12"
+                    IsChecked="{Binding ShowHiddenFiles}" />
+        </Grid>
+      </Border>
+
+      <!-- Quick Access: pinned folders for this device (spec section 66) -->
+      <Border DockPanel.Dock="Left" Width="170" Padding="10"
+              IsVisible="{Binding HasFavorites}"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="0,0,1,0">
+        <StackPanel Spacing="3">
+          <TextBlock Text="QUICK ACCESS" FontSize="10" FontWeight="SemiBold" Opacity="0.55"
+                     Margin="6,2,0,6" />
+          <ItemsControl ItemsSource="{Binding Favorites}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FavoriteViewModel">
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Padding="8,5" Margin="0,1" Background="Transparent" BorderThickness="0"
+                        ToolTip.Tip="{Binding Tooltip}"
+                        Command="{Binding $parent[UserControl].((vm:ExplorerViewModel)DataContext).GoToFavoriteCommand}"
+                        CommandParameter="{Binding}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="★" FontSize="11" Opacity="0.6" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Label}" FontSize="12"
+                               TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- Entry list. A ListBox virtualizes by default, which is what keeps 10,000+ entries smooth
+           (spec section 45). Column headers double as sort controls (spec section 8). -->
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Padding="8,4"
+                Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+          <Grid ColumnDefinitions="26,*,110,90,150">
+            <Button Grid.Column="1" Content="Name" HorizontalAlignment="Left" Padding="4,2"
+                    Background="Transparent" BorderThickness="0" FontSize="12"
+                    Command="{Binding SortByCommand}" CommandParameter="Name" />
+            <Button Grid.Column="2" Content="Type" HorizontalAlignment="Left" Padding="4,2"
+                    Background="Transparent" BorderThickness="0" FontSize="12"
+                    Command="{Binding SortByCommand}" CommandParameter="Type" />
+            <Button Grid.Column="3" Content="Size" HorizontalAlignment="Right" Padding="4,2"
+                    Background="Transparent" BorderThickness="0" FontSize="12"
+                    Command="{Binding SortByCommand}" CommandParameter="Size" />
+            <Button Grid.Column="4" Content="Modified" HorizontalAlignment="Left" Padding="4,2"
+                    Background="Transparent" BorderThickness="0" FontSize="12"
+                    Command="{Binding SortByCommand}" CommandParameter="Modified" />
+          </Grid>
+        </Border>
+
+        <!-- Multiple selection so several files and folders can be transferred at once (spec section 31) -->
+        <ListBox ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}"
+                 SelectionMode="Multiple"
+                 SelectionChanged="OnSelectionChanged"
+                 Background="Transparent" BorderThickness="0">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:EntryRowViewModel">
+              <Grid ColumnDefinitions="26,*,110,90,150" Height="26">
+                <Grid.ContextMenu>
+                  <!-- Context menu (spec section 32) -->
+                  <ContextMenu>
+                    <MenuItem Header="Open"
+                              Command="{Binding $parent[ListBox].((vm:ExplorerViewModel)DataContext).OpenCommand}"
+                              CommandParameter="{Binding}" />
+                    <MenuItem Header="Download to this PC"
+                              Command="{Binding $parent[ListBox].((vm:ExplorerViewModel)DataContext).DownloadSelectedCommand}" />
+                    <Separator />
+                    <MenuItem Header="Rename"
+                              Command="{Binding $parent[ListBox].((vm:ExplorerViewModel)DataContext).RenameCommand}"
+                              CommandParameter="{Binding}" />
+                    <MenuItem Header="Delete"
+                              Command="{Binding $parent[ListBox].((vm:ExplorerViewModel)DataContext).DeleteCommand}"
+                              CommandParameter="{Binding}" />
+                    <Separator />
+                    <MenuItem Header="Properties"
+                              Command="{Binding $parent[ListBox].((vm:ExplorerViewModel)DataContext).ShowPropertiesCommand}"
+                              CommandParameter="{Binding}" />
+                  </ContextMenu>
+                </Grid.ContextMenu>
+
+                <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Text="{Binding TypeText}" VerticalAlignment="Center"
+                           Opacity="0.7" FontSize="12" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="3" Text="{Binding SizeText}" VerticalAlignment="Center"
+                           Opacity="0.7" FontSize="12" HorizontalAlignment="Right" />
+                <TextBlock Grid.Column="4" Text="{Binding ModifiedText}" VerticalAlignment="Center"
+                           Opacity="0.7" FontSize="12" Margin="12,0,0,0" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="8,2" />
+              <Setter Property="MinHeight" Value="0" />
+            </Style>
+          </ListBox.Styles>
+        </ListBox>
+      </DockPanel>
+
+    </DockPanel>
+
+    <!-- Loading indicator -->
+    <Border VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,120,0,0"
+            IsVisible="{Binding IsLoading}"
+            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
+            CornerRadius="4" Padding="14,8">
+      <TextBlock Text="Reading folder…" FontSize="12" />
+    </Border>
+
+    <!-- Errors as sentences, never protocol text (spec section 48) -->
+    <Border VerticalAlignment="Bottom" Margin="16" Padding="14" CornerRadius="6"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            BorderThickness="1">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding ErrorMessage}" TextWrapping="Wrap"
+                   VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Dismiss" Margin="12,0,0,0"
+                Command="{Binding DismissErrorCommand}" />
+      </Grid>
+    </Border>
+
+    <!-- Inline prompt for new folder and rename -->
+    <Border IsVisible="{Binding IsPromptOpen}" Background="#80000000">
+      <Border VerticalAlignment="Center" HorizontalAlignment="Center" Width="420" Padding="20"
+              CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="12">
+          <TextBlock Text="{Binding PromptTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBox Text="{Binding PromptValue}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding SubmitPromptCommand}" />
+              <KeyBinding Gesture="Escape" Command="{Binding CancelPromptCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <TextBlock Text="{Binding PromptError}" FontSize="12" TextWrapping="Wrap"
+                     IsVisible="{Binding PromptError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Content="Cancel" Command="{Binding CancelPromptCommand}" />
+            <Button Content="OK" Command="{Binding SubmitPromptCommand}" IsDefault="True" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+
+    <!-- Properties, with EXIF where the file carries it (spec section 33) -->
+    <Border IsVisible="{Binding IsPropertiesOpen}" Background="#80000000">
+      <Border VerticalAlignment="Center" HorizontalAlignment="Center" Width="480" MaxHeight="620"
+              Padding="20" CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,14">
+            <TextBlock Text="{Binding Properties.Name}" FontSize="16" FontWeight="SemiBold"
+                       TextWrapping="Wrap" />
+            <SelectableTextBlock Text="{Binding Properties.FullPath}" FontSize="11" Opacity="0.6"
+                                 TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" />
+          </StackPanel>
+
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8"
+                      HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="Close" Command="{Binding ClosePropertiesCommand}" IsDefault="True" />
+          </StackPanel>
+
+          <ScrollViewer>
+            <StackPanel Spacing="14">
+
+              <TextBlock Text="Reading details…" FontSize="12" Opacity="0.7"
+                         IsVisible="{Binding Properties.IsLoading}" />
+
+              <ItemsControl ItemsSource="{Binding Properties.General}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:PropertyRow">
+                    <Grid ColumnDefinitions="130,*" Margin="0,3">
+                      <TextBlock Grid.Column="0" Text="{Binding Label}" Opacity="0.7" FontSize="12" />
+                      <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12"
+                                           TextWrapping="Wrap" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <StackPanel Spacing="6" IsVisible="{Binding Properties.HasCamera}">
+                <TextBlock Text="CAMERA" FontSize="10" FontWeight="SemiBold" Opacity="0.55" />
+                <ItemsControl ItemsSource="{Binding Properties.Camera}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PropertyRow">
+                      <Grid ColumnDefinitions="130,*" Margin="0,3">
+                        <TextBlock Grid.Column="0" Text="{Binding Label}" Opacity="0.7" FontSize="12" />
+                        <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12"
+                                             TextWrapping="Wrap" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+
+              <!-- Location is sensitive: presence is shown, coordinates only on request (spec section 43) -->
+              <StackPanel Spacing="6" IsVisible="{Binding Properties.HasLocation}">
+                <TextBlock Text="LOCATION" FontSize="10" FontWeight="SemiBold" Opacity="0.55" />
+                <SelectableTextBlock Text="{Binding Properties.LocationText}" FontSize="12"
+                                     TextWrapping="Wrap" />
+                <Button Content="Show coordinates" FontSize="11" HorizontalAlignment="Left"
+                        Command="{Binding Properties.RevealLocationCommand}"
+                        IsVisible="{Binding !Properties.IsLocationRevealed}" />
+                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                           Text="Coordinates are read only when you ask, and are never saved or written to logs." />
+              </StackPanel>
+
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Border>
+
+    <!-- Transfer preview before anything moves (spec section 34) -->
+    <Border IsVisible="{Binding IsPlanOpen}" Background="#80000000">
+      <Border VerticalAlignment="Center" HorizontalAlignment="Center" Width="480" Padding="20"
+              CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="12">
+          <TextBlock Text="{Binding PlanTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding PlanDetails}" TextWrapping="Wrap" Opacity="0.85" />
+          <TextBlock Text="{Binding PlanConflicts}" TextWrapping="Wrap" FontSize="12" Opacity="0.7"
+                     IsVisible="{Binding PlanConflicts, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Content="Cancel" Command="{Binding CancelPlanCommand}" />
+            <Button Content="Start transfer" Command="{Binding ConfirmPlanCommand}" IsDefault="True" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+
+    <!-- Delete confirmation: Android has no recycle bin (spec section 51) -->
+    <Border IsVisible="{Binding IsConfirmOpen}" Background="#80000000">
+      <Border VerticalAlignment="Center" HorizontalAlignment="Center" Width="460" Padding="20"
+              CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="16">
+          <TextBlock Text="{Binding ConfirmMessage}" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Content="Cancel" Command="{Binding CancelConfirmCommand}" />
+            <Button Content="Delete" Command="{Binding ConfirmCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+
+  </Panel>
+
+</UserControl>

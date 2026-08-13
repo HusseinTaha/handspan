@@ -1,6 +1,6 @@
 # Implementation plan
 
-Full plan for Android Explorer, from empty repo to finished product. Phase ordering follows
+Full plan for Handspan, from empty repo to finished product. Phase ordering follows
 the spec's own recommended build order (`docs/notes.txt` §97). Each phase ends with
 something runnable and independently verifiable.
 
