@@ -8,6 +8,7 @@
         x:Class="Handspan.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Handspan"
+        Icon="/Assets/handspan-256.png"
         Width="1180" Height="760"
         MinWidth="880" MinHeight="560">
 

@@ -268,10 +268,18 @@ public sealed class MultiDeviceTests : IAsyncLifetime
                 throw new InvalidOperationException($"transfer failed: {job.Error}");
             }
 
-            await Task.Delay(20);
+            // ConfigureAwait(false) so the poll does not need the runner's synchronisation
+            // context to resume, which is contended when every test assembly runs at once.
+            await Task.Delay(20).ConfigureAwait(false);
         }
 
-        throw new TimeoutException("the transfer did not finish");
+        // A bare "did not finish" leaves nothing to work from when this trips on a loaded CI
+        // runner, where a 30 second wait is the first thing to go. Report the state instead.
+        var last = manager.Jobs.FirstOrDefault(candidate => candidate.Id == id);
+        throw new TimeoutException(
+            $"the transfer did not finish within 30s; last status was {last?.Status.ToString() ?? "job missing"}, "
+            + $"bytes {last?.BytesTransferred}/{last?.TotalBytes}, retries {last?.RetryCount}, "
+            + $"error {last?.Error ?? "none"}");
     }
 
     private sealed class StubSettings : ISettingsService

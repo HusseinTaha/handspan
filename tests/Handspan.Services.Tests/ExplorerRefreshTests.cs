@@ -1,4 +1,5 @@
-﻿using Handspan.App.ViewModels;
+﻿using System.Collections.Concurrent;
+using Handspan.App.ViewModels;
 using Handspan.Core.Interfaces;
 using Handspan.Core.Models;
 using Handspan.Core.Platform;
@@ -16,13 +17,16 @@ namespace Handspan.Services.Tests;
 /// ADB has no filesystem watcher, which means completion events are the only signal available — and if they
 /// are not wired up, an upload appears to do nothing until the user presses F5.
 /// </remarks>
-public sealed class ExplorerRefreshTests
+public sealed class ExplorerRefreshTests : IDisposable
 {
     /// <summary>Long enough to cover the coalescing delay in the view model, with margin.</summary>
     private static readonly TimeSpan SettleWindow = TimeSpan.FromSeconds(3);
 
-    private static (ExplorerViewModel Explorer, StubFileSystem Files, StubTransfers Transfers)
-        Create()
+    private readonly TestDispatcher _dispatcher = new();
+
+    public void Dispose() => _dispatcher.Dispose();
+
+    private (ExplorerViewModel Explorer, StubFileSystem Files, StubTransfers Transfers) Create()
     {
         var files = new StubFileSystem();
         var transfers = new StubTransfers();
@@ -32,26 +36,25 @@ public sealed class ExplorerRefreshTests
             new StubShell(),
             new StubSettings(),
             new StubProfiles(),
-            new InlineDispatcher(),
+            _dispatcher,
             NullLogger<ExplorerViewModel>.Instance);
 
         return (explorer, files, transfers);
     }
 
-    private static async Task<(ExplorerViewModel, StubFileSystem, StubTransfers)> AttachAsync()
+    private async Task<(ExplorerViewModel, StubFileSystem, StubTransfers)> AttachAsync()
     {
         var (explorer, files, transfers) = Create();
         await explorer.AttachAsync(new StubSession(files, transfers));
         return (explorer, files, transfers);
     }
 
-    /// <summary>
-    /// Waits for the listing count to rise, pumping the dispatcher as it goes.
-    /// </summary>
+    /// <summary>Waits for the listing count to rise, or gives up after <see cref="SettleWindow"/>.</summary>
     /// <remarks>
-    /// The view model marshals onto the UI thread, as it must — mutating a bound collection from a transfer
-    /// worker thread would break the binding. There is no message loop in a test host, so the queued work has
-    /// to be pumped by hand or it never runs.
+    /// The count is incremented on the dispatcher thread and read here, hence the volatile read in
+    /// <see cref="StubFileSystem.ListCalls"/>. Observing the count is not enough to assert on
+    /// <c>Entries</c> though: the listing is counted before the collection is repopulated, so callers
+    /// must drain the dispatcher first.
     /// </remarks>
     private static async Task<bool> WaitForListingsAsync(StubFileSystem files, int atLeast)
     {
@@ -59,25 +62,22 @@ public sealed class ExplorerRefreshTests
 
         while (DateTime.UtcNow < deadline)
         {
-
             if (files.ListCalls >= atLeast)
             {
                 return true;
             }
 
-            await Task.Delay(25);
+            await Task.Delay(25).ConfigureAwait(false);
         }
 
         return false;
     }
 
-    /// <summary>Pumps the dispatcher for a while, for the tests that assert nothing happens.</summary>
-    private static async Task SettleAsync()
+    /// <summary>Waits out the coalescing window, for the tests that assert nothing happens.</summary>
+    private async Task SettleAsync()
     {
-        for (var i = 0; i < 60; i++)
-        {
-            await Task.Delay(25);
-        }
+        await Task.Delay(SettleWindow / 2).ConfigureAwait(false);
+        await _dispatcher.DrainAsync().ConfigureAwait(false);
     }
 
     [Fact]
@@ -93,6 +93,10 @@ public sealed class ExplorerRefreshTests
 
         Assert.True(await WaitForListingsAsync(files, before + 1),
             "the Explorer never re-listed the folder after the upload completed");
+
+        // The listing is counted before Entries is repopulated, so the collection is only stable
+        // once the dispatcher has finished the work that fills it.
+        await _dispatcher.DrainAsync();
 
         Assert.Contains(explorer.Entries, row => row.Name == "arrived.bin");
     }
@@ -110,6 +114,7 @@ public sealed class ExplorerRefreshTests
         transfers.RaiseCompletedUpload(deep);
 
         Assert.True(await WaitForListingsAsync(files, before + 1));
+        await _dispatcher.DrainAsync();
         Assert.Contains(explorer.Entries, row => row.Name == "newfolder");
     }
 
@@ -216,16 +221,106 @@ public sealed class ExplorerRefreshTests
     // ---------------- stubs ----------------
 
     /// <summary>Runs posted work immediately, so a test can observe the result.</summary>
-    private sealed class InlineDispatcher : IUiDispatcher
+    /// <summary>
+    /// Stands in for Avalonia's dispatcher: one thread that owns a <see cref="SynchronizationContext"/>.
+    /// </summary>
+    /// <remarks>
+    /// Running posted work inline is simpler and is how this started, but it leaves whatever context the
+    /// test runner installed as the ambient one. <c>ScheduleRefreshAsync</c> awaits its coalescing delay
+    /// with <c>ConfigureAwait(true)</c> — correct in the app, where it resumes on the UI thread — so inline
+    /// posting made it capture xUnit's limited-concurrency context instead. The continuation then queued
+    /// behind every other test class running in parallel and the wait window expired under load, which is
+    /// exactly the flake this replaces. Owning a thread makes resumption deterministic and models the real
+    /// dispatcher rather than bypassing it.
+    /// </remarks>
+    private sealed class TestDispatcher : IUiDispatcher, IDisposable
     {
-        public void Post(Action action) => action();
+        private readonly BlockingCollection<Action> _queue = new();
+        private readonly Thread _thread;
+
+        public TestDispatcher()
+        {
+            _thread = new Thread(Pump)
+            {
+                IsBackground = true,
+                Name = "test-ui-dispatcher",
+            };
+            _thread.Start();
+        }
+
+        public void Post(Action action) => Enqueue(action);
+
+        /// <summary>Completes once everything already queued has run.</summary>
+        /// <remarks>
+        /// The queue is FIFO on a single thread, so a sentinel posted now runs after all work posted
+        /// before it. That is what makes it safe to assert on a bound collection from the test thread.
+        /// </remarks>
+        public Task DrainAsync()
+        {
+            var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!Enqueue(() => done.TrySetResult()))
+            {
+                done.TrySetResult();
+            }
+
+            return done.Task;
+        }
+
+        private bool Enqueue(Action action)
+        {
+            try
+            {
+                _queue.Add(action);
+                return true;
+            }
+            catch (Exception e) when (e is InvalidOperationException or ObjectDisposedException)
+            {
+                // Disposed, or racing a shutdown. Dropping the work is correct here.
+                return false;
+            }
+        }
+
+        private void Pump()
+        {
+            SynchronizationContext.SetSynchronizationContext(new QueueContext(this));
+
+            foreach (var action in _queue.GetConsumingEnumerable())
+            {
+                try
+                {
+                    action();
+                }
+                catch
+                {
+                    // A dispatcher that kills the process on a handler fault would mask the real
+                    // assertion. Failures surface through the assertions instead.
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            _queue.CompleteAdding();
+            _thread.Join(TimeSpan.FromSeconds(5));
+            _queue.Dispose();
+        }
+
+        /// <summary>Sends continuations back to the dispatcher thread, as Avalonia's context does.</summary>
+        private sealed class QueueContext(TestDispatcher owner) : SynchronizationContext
+        {
+            public override void Post(SendOrPostCallback d, object? state) => owner.Enqueue(() => d(state));
+
+            public override void Send(SendOrPostCallback d, object? state) => d(state);
+        }
     }
 
     private sealed class StubFileSystem : IDeviceFileSystem
     {
         private readonly Dictionary<DevicePath, bool> _entries = [];
+        private int _listCalls;
 
-        public int ListCalls { get; private set; }
+        /// <summary>Incremented on the dispatcher thread, read from the test thread.</summary>
+        public int ListCalls => Volatile.Read(ref _listCalls);
 
         public DeviceId DeviceId { get; } = new("refreshDevice");
 
@@ -234,7 +329,7 @@ public sealed class ExplorerRefreshTests
         public Task<IReadOnlyList<DeviceEntry>> ListAsync(
             DevicePath path, CancellationToken cancellationToken)
         {
-            ListCalls++;
+            Interlocked.Increment(ref _listCalls);
 
             var children = _entries
                 .Where(pair => pair.Key.Parent == path)

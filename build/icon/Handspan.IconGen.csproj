@@ -1,0 +1,23 @@
+<!--
+  Generates every Handspan icon asset from code, so the marks are reproducible rather than
+  mystery binaries. Not part of Handspan.sln and never shipped: run it by hand after changing
+  the design (see build/icon/README.md).
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Handspan.IconGen</RootNamespace>
+    <AssemblyName>Handspan.IconGen</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="4.151.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="4.151.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="4.151.1" />
+  </ItemGroup>
+
+</Project>

@@ -33,6 +33,17 @@ if (Test-Path $bundle) {
 New-Item -ItemType Directory -Force -Path $macos, $resources | Out-Null
 Copy-Item (Join-Path $PublishDir '*') $macos -Recurse -Force
 
+# Info.plist below declares CFBundleIconFile = AppIcon, so the .icns has to land in Resources
+# under exactly that name. Without it macOS silently falls back to a blank generic tile, which
+# is what happened for every build before this.
+$icns = Join-Path $PSScriptRoot 'AppIcon.icns'
+if (Test-Path $icns) {
+    Copy-Item $icns (Join-Path $resources 'AppIcon.icns') -Force
+}
+else {
+    Write-Warning "AppIcon.icns not found at $icns - bundle will show a generic icon. Regenerate it with build/icon."
+}
+
 # LSMinimumSystemVersion 12.0 matches Avalonia's own macOS floor.
 # NSHighResolutionCapable keeps the UI from rendering blurred on Retina displays.
 $plist = @"
@@ -72,7 +83,7 @@ Set-Content -Path (Join-Path $contents 'Info.plist') -Value $plist -Encoding utf
 # not launch until this is run on the Mac. Shipping the script beside it removes the guesswork.
 $finish = @'
 #!/bin/sh
-# Prepares an Handspan bundle that was built on Windows.
+# Prepares a Handspan bundle that was built on Windows.
 #   ./finish-macos-build.sh "Handspan (Apple Silicon).app"
 #   ./finish-macos-build.sh "Handspan (Intel).app"
 set -e

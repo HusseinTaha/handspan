@@ -1,3 +1,5 @@
+<img src="docs/assets/logo.png" width="96" alt="Handspan">
+
 # Handspan
 
 A desktop file manager and photo gallery for Android devices, over ADB — for **Windows and
