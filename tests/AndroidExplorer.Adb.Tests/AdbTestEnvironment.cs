@@ -40,6 +40,13 @@ internal static class AdbTestEnvironment
 
     private static string? FindAdb()
     {
+        // CI runners ship an adb of their own but never a phone. Finding it there would start a real
+        // adb daemon on the runner to prove nothing, so an explicit opt-out keeps CI hermetic.
+        if (Environment.GetEnvironmentVariable("ANDROIDEXPLORER_NO_DEVICE_TESTS") is { Length: > 0 })
+        {
+            return null;
+        }
+
         var candidates = new List<string>
         {
             Path.Combine(
