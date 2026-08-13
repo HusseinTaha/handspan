@@ -89,23 +89,38 @@ foreach ($rid in $runtimes) {
         $arch = if ($rid -eq 'osx-arm64') { 'Apple Silicon' } else { 'Intel' }
         & (Join-Path $PSScriptRoot 'make-app-bundle.ps1') `
             -PublishDir $output -Version $Version -Suffix $arch
+
+        # Zip it so it can be moved to a Mac. Neither a zip nor a Windows build carries the Unix
+        # executable bit, which is why finish-macos-build.sh travels inside the archive.
+        #
+        # The archive is named for the release rather than for the bundle: a download called
+        # "Handspan (Apple Silicon).app.zip" carries no version, and GitHub rewrites the spaces in it.
+        # The bundle keeps its readable name, because that is what shows up in Finder.
+        $slug = if ($rid -eq 'osx-arm64') { 'apple-silicon' } else { 'intel' }
+        $archive = Join-Path $OutputRoot "Handspan-$Version-macos-$slug.zip"
+        if (Test-Path $archive) { Remove-Item $archive -Force }
+
+        # bsdtar, NOT Compress-Archive. Compress-Archive on PowerShell 5.1 writes entry names with
+        # BACKSLASH separators, and so does .NET Framework's ZipFile. Windows extractors tolerate that;
+        # macOS unzip does not — it creates single files literally named
+        # "Handspan (Apple Silicon).app\Contents\MacOS\Handspan" and the bundle never reassembles.
+        # A .app is a directory, so this is the difference between a working download and a broken one.
+        # bsdtar ships with Windows 10+ and writes forward slashes and Unix attributes.
+        Push-Location $OutputRoot
+        try {
+            tar -a -c -f $archive "Handspan ($arch).app" 'finish-macos-build.sh'
+            if ($LASTEXITCODE -ne 0) { throw "tar failed for $rid" }
+        }
+        finally {
+            Pop-Location
+        }
+
+        Write-Host ("  archive: {0} ({1:N1} MB)" -f `
+            (Split-Path $archive -Leaf), ((Get-Item $archive).Length / 1MB)) -ForegroundColor Green
     }
 
     $size = (Get-ChildItem $output -Recurse -File | Measure-Object -Property Length -Sum).Sum
     Write-Host ("  {0}: {1:N1} MB" -f $rid, ($size / 1MB)) -ForegroundColor Green
-}
-
-if ($runtimes -contains 'osx-arm64' -or $runtimes -contains 'osx-x64') {
-    # Zip the bundles so they can be moved to a Mac. Neither zip nor a Windows build carries the Unix
-    # executable bit, which is why finish-macos-build.sh ships alongside them.
-    foreach ($bundle in Get-ChildItem $OutputRoot -Directory -Filter '*.app') {
-        $archive = Join-Path $OutputRoot ("$($bundle.BaseName).zip")
-        if (Test-Path $archive) { Remove-Item $archive -Force }
-
-        Compress-Archive -Path $bundle.FullName, (Join-Path $OutputRoot 'finish-macos-build.sh') `
-            -DestinationPath $archive
-        Write-Host ("  archive: {0} ({1:N1} MB)" -f (Split-Path $archive -Leaf), ((Get-Item $archive).Length / 1MB)) -ForegroundColor Green
-    }
 }
 
 Write-Host ''

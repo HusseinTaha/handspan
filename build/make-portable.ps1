@@ -79,6 +79,8 @@ Handspan.portable          delete to disable portable mode
 LICENSE                    MIT
 THIRD-PARTY-NOTICES.md     licences of everything bundled
 
+Source, issues and newer builds: https://github.com/HusseinTaha/handspan
+
 Handspan is open source under the MIT licence. "Android" is a trademark of Google LLC;
 Handspan is not affiliated with or endorsed by Google.
 "@
@@ -96,14 +98,19 @@ foreach ($document in @('LICENSE', 'THIRD-PARTY-NOTICES.md')) {
 $archive = "$PublishDir.zip"
 if (Test-Path $archive) { Remove-Item $archive -Force }
 
-# Not Compress-Archive: it takes minutes over a folder this size on PowerShell 5.1, and stores paths in a
-# way some extractors mishandle. includeBaseDirectory puts everything under one folder in the zip.
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory(
-    $PublishDir,
-    $archive,
-    [System.IO.Compression.CompressionLevel]::Optimal,
-    $true)
+# bsdtar rather than Compress-Archive or ZipFile.CreateFromDirectory. Both of those write entry names
+# with backslash separators when run on PowerShell 5.1 (.NET Framework), which Windows extractors
+# tolerate but anything else does not — a Linux or macOS user unpacking this to prepare a stick would
+# get one file with backslashes in its name. Compress-Archive is also minutes slower at this size.
+# Naming the parent directory keeps exactly one top-level folder inside the zip.
+Push-Location (Split-Path $PublishDir -Parent)
+try {
+    tar -a -c -f $archive (Split-Path $PublishDir -Leaf)
+    if ($LASTEXITCODE -ne 0) { throw 'tar failed while building the portable archive' }
+}
+finally {
+    Pop-Location
+}
 
 $size = (Get-Item $archive).Length / 1MB
 Write-Host ("  portable zip: {0} ({1:N1} MB)" -f (Split-Path $archive -Leaf), $size) -ForegroundColor Green
