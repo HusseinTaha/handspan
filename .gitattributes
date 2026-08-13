@@ -22,10 +22,15 @@
 # PowerShell is happy either way, but CRLF matches the platform it runs on.
 *.ps1       text eol=crlf
 
-# Binary, so Git never tries to translate them.
+# Binary, so Git never tries to translate them. Listing a format explicitly matters: anything
+# not named here falls through to "* text=auto" above, which decides by sniffing for NUL bytes.
+# That heuristic happens to get .icns right, but a binary format should not depend on a guess.
 *.png       binary
 *.jpg       binary
+*.jpeg      binary
+*.gif       binary
 *.ico       binary
+*.icns      binary
 *.webp      binary
 *.zip       binary
 *.apk       binary

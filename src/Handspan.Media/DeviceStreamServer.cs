@@ -29,8 +29,10 @@ namespace Handspan.Media;
 public sealed class DeviceStreamServer : IAsyncDisposable
 {
     private readonly ILogger<DeviceStreamServer> _logger;
-    private readonly HttpListener _listener = new();
     private readonly CancellationTokenSource _shutdown = new();
+
+    // Not readonly: a listener whose Start threw is not reusable, so a lost bind race replaces it.
+    private HttpListener _listener = new();
 
     /// <summary>Registered streams, keyed by an unguessable id. Nothing else can be served.</summary>
     private readonly ConcurrentDictionary<string, StreamEntry> _entries = new();
@@ -51,7 +53,25 @@ public sealed class DeviceStreamServer : IAsyncDisposable
 
     public bool IsRunning => _loop is not null;
 
+    /// <summary>Where <see cref="Start"/> gets candidate ports from.</summary>
+    /// <remarks>
+    /// A seam, because the retry below cannot be tested any other way: the collision it exists for
+    /// depends on the OS reissuing a port in the microseconds after the probe released it, which is not
+    /// reproducible on demand. Handing the test a provider that returns an occupied port makes the
+    /// retry deterministic instead of relying on losing a race at the right moment.
+    /// </remarks>
+    internal Func<int> PortProvider { get; set; } = FindFreePort;
+
     /// <summary>Starts on a free loopback port.</summary>
+    /// <remarks>
+    /// The bind is retried because asking the OS for a free port cannot reserve it:
+    /// <see cref="FindFreePort"/> has to release the port before <see cref="HttpListener"/> is able to
+    /// take it, and in that window any other process — including a second copy of this app, or a
+    /// concurrently starting server in a test run — can claim it. Two probes racing can even be handed
+    /// the same number, since each releases before either binds. There is no atomic reserve-and-hand-over
+    /// with HttpListener, so losing the race is treated as ordinary and retried on a fresh port rather
+    /// than thrown at the user as a failed video.
+    /// </remarks>
     public void Start()
     {
         if (_loop is not null)
@@ -59,9 +79,31 @@ public sealed class DeviceStreamServer : IAsyncDisposable
             return;
         }
 
-        Port = FindFreePort();
-        _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
-        _listener.Start();
+        const int attempts = 8;
+
+        for (var attempt = 1; ; attempt++)
+        {
+            var candidate = PortProvider();
+
+            try
+            {
+                _listener.Prefixes.Add($"http://127.0.0.1:{candidate}/");
+                _listener.Start();
+                Port = candidate;
+                break;
+            }
+            catch (HttpListenerException ex) when (attempt < attempts)
+            {
+                _logger.LogDebug(
+                    ex,
+                    "Loopback port {Port} was taken between probe and bind; retrying on another port.",
+                    candidate);
+
+                // A listener that failed to start cannot be started again, even with new prefixes.
+                _listener.Close();
+                _listener = new HttpListener();
+            }
+        }
 
         _loop = Task.Run(AcceptLoopAsync, CancellationToken.None);
         _logger.LogInformation("Media streaming server listening on loopback port {Port}.", Port);

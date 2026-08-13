@@ -185,6 +185,77 @@ public sealed class DeviceStreamServerTests : IAsyncLifetime
         Assert.Equal("127.0.0.1", _url.Host);
     }
 
+    /// <summary>
+    /// Starting must survive the port being claimed between the free-port probe and the bind.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The regression test for an intermittent failure that appeared to belong to whichever test in this
+    /// class ran first. The cause was in <c>Start</c>: probing for a free port releases it before
+    /// HttpListener can take it, so a colliding claim threw HttpListenerException out of
+    /// <see cref="InitializeAsync"/> rather than out of any test body.
+    /// </para>
+    /// <para>
+    /// The collision is forced through the port provider. Simply starting many servers at once does not
+    /// reproduce it — each probe holds its port while bound, so concurrent probes get different numbers,
+    /// and a test written that way passes against the broken code too.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Starting_survives_the_probed_port_being_taken_first()
+    {
+        // Occupy a port for real, so the first bind attempt genuinely fails.
+        var occupied = new HttpListener();
+        var occupiedPort = FreeLoopbackPort();
+        occupied.Prefixes.Add($"http://127.0.0.1:{occupiedPort}/");
+        occupied.Start();
+
+        try
+        {
+            var server = new DeviceStreamServer(NullLogger<DeviceStreamServer>.Instance);
+
+            // Hand out the taken port twice, then let it find a real one.
+            var handouts = 0;
+            server.PortProvider = () =>
+            {
+                handouts++;
+                return handouts <= 2 ? occupiedPort : FreeLoopbackPort();
+            };
+
+            server.Start();
+
+            await using (server)
+            {
+                Assert.True(server.IsRunning);
+                Assert.NotEqual(occupiedPort, server.Port);
+                Assert.Equal(3, handouts);
+
+                // And it is actually serving on the port it reports, not merely holding a number.
+                var url = server.Register(
+                    _fixture.CreateFileSystem(), KnownPaths.Movies.Combine("clip.mp4"), _content.Length);
+
+                Assert.Equal(server.Port, url.Port);
+
+                using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                var response = await probe.GetAsync(url);
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            }
+        }
+        finally
+        {
+            occupied.Close();
+        }
+    }
+
+    private static int FreeLoopbackPort()
+    {
+        using var probe = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        return port;
+    }
+
     [Theory]
     [InlineData(null, 0, 1000, false)]
     [InlineData("", 0, 1000, false)]
