@@ -1,4 +1,4 @@
-using AndroidExplorer.Core.Platform;
+﻿using AndroidExplorer.Core.Platform;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +20,7 @@ public static class MediaServiceCollectionExtensions
         services.AddSingleton<IThumbnailServiceFactory, ThumbnailServiceFactory>();
         services.AddSingleton<IGalleryServiceFactory, GalleryServiceFactory>();
         services.AddSingleton<IBackupServiceFactory, BackupServiceFactory>();
+        services.AddSingleton<IMetadataServiceFactory, MetadataServiceFactory>();
 
         // One loopback streaming server for the whole application; it is started lazily on first use.
         services.AddSingleton<DeviceStreamServer>();
@@ -30,3 +31,4 @@ public static class MediaServiceCollectionExtensions
         return services;
     }
 }
+

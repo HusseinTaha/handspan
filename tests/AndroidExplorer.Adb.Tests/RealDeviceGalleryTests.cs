@@ -335,6 +335,119 @@ public sealed class RealDeviceGalleryTests : IAsyncLifetime
             $"STREAM: served a range from a {video.Size / (1024.0 * 1024):N1} MB video without downloading it");
     }
 
+    /// <summary>
+    /// Reads EXIF from real camera photos, transferring only the header (spec §33).
+    /// </summary>
+    [RequiresOnlineDeviceFact]
+    public async Task Exif_is_read_from_real_photos_without_pulling_them()
+    {
+        if (!Available)
+        {
+            return;
+        }
+
+        using var cancellation = new CancellationTokenSource(Timeout);
+        var gallery = CreateGallery();
+        var metadata = new MetadataService(_fileSystem!, NullLogger<MetadataService>.Instance);
+
+        await gallery.RefreshAsync(null, cancellation.Token);
+
+        var photos = (await gallery.GetTimelineAsync(MediaKind.Image, 0, 40, cancellation.Token))
+            .Where(item => item.Size > 200 * 1024)
+            .Take(8)
+            .ToList();
+
+        Assert.NotEmpty(photos);
+
+        var withDimensions = 0;
+        var withCamera = 0;
+        var withLocation = 0;
+
+        foreach (var photo in photos)
+        {
+            var details = await metadata.GetMetadataAsync(photo.Path, cancellation.Token);
+
+            Assert.NotNull(details.MimeType);
+
+            if (details is { Width: > 0, Height: > 0 })
+            {
+                withDimensions++;
+            }
+
+            if (details.Exif?.CameraModel is not null || details.Exif?.DateTaken is not null)
+            {
+                withCamera++;
+            }
+
+            if (details.Exif?.HasGpsCoordinates == true)
+            {
+                withLocation++;
+
+                // Presence may be reported, but the coordinates must not be filled in unasked (spec §43).
+                Assert.Null(details.Exif.GpsCoordinates);
+            }
+        }
+
+        Console.WriteLine(
+            $"EXIF: {withDimensions}/{photos.Count} had dimensions, {withCamera} had camera data, "
+            + $"{withLocation} carried location");
+
+        // Dimensions are the minimum any real photo should yield from its header.
+        Assert.True(withDimensions > 0,
+            $"no dimensions could be read from {photos.Count} real photos");
+    }
+
+    /// <summary>Coordinates come back only when explicitly requested (spec §33, §43).</summary>
+    [RequiresOnlineDeviceFact]
+    public async Task Gps_coordinates_are_only_returned_when_asked_for()
+    {
+        if (!Available)
+        {
+            return;
+        }
+
+        using var cancellation = new CancellationTokenSource(Timeout);
+        var gallery = CreateGallery();
+        var metadata = new MetadataService(_fileSystem!, NullLogger<MetadataService>.Instance);
+
+        await gallery.RefreshAsync(null, cancellation.Token);
+
+        var photos = await gallery.GetTimelineAsync(MediaKind.Image, 0, 60, cancellation.Token);
+
+        MediaItem? located = null;
+        foreach (var photo in photos.Where(item => item.Size > 200 * 1024).Take(25))
+        {
+            var details = await metadata.GetMetadataAsync(photo.Path, cancellation.Token);
+            if (details.Exif?.HasGpsCoordinates == true)
+            {
+                located = photo;
+                break;
+            }
+        }
+
+        if (located is null)
+        {
+            Console.WriteLine("GPS: no geotagged photo found on this device to test with.");
+            return;
+        }
+
+        var withheld = await metadata.GetMetadataAsync(located.Path, cancellation.Token);
+        Assert.True(withheld.Exif!.HasGpsCoordinates);
+        Assert.Null(withheld.Exif.GpsCoordinates);
+
+        var revealed = await metadata.GetMetadataAsync(
+            located.Path, includeGpsCoordinates: true, cancellation.Token);
+
+        Assert.NotNull(revealed.Exif!.GpsCoordinates);
+
+        var (latitude, longitude) = revealed.Exif.GpsCoordinates!.Value;
+        Assert.InRange(latitude, -90, 90);
+        Assert.InRange(longitude, -180, 180);
+
+        // Deliberately not printed: this is the user's location.
+        Console.WriteLine("GPS: coordinates were withheld by default and returned on request.");
+    }
+
     private sealed class FixedSettings(AppSettings settings) : ISettingsService
     {
         public AppSettings Current { get; } = settings;

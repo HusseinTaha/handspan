@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using AndroidExplorer.Adb;
 using AndroidExplorer.Core.Exceptions;
 using AndroidExplorer.Core.Interfaces;
@@ -27,6 +27,7 @@ internal sealed class DeviceManager(
     IGalleryServiceFactory gallery,
     ISearchServiceFactory search,
     IBackupServiceFactory backup,
+    IMetadataServiceFactory metadataFactory,
     ISettingsService settings,
     MediaPreviewService previews,
     ILogger<DeviceManager> logger) : IDeviceManager
@@ -145,7 +146,8 @@ internal sealed class DeviceManager(
             }
 
             var session = new DeviceSession(
-                info, fileSystemFactory, cache, transfers, thumbnails, gallery, search, backup, settings);
+                info, fileSystemFactory, cache, transfers, thumbnails, gallery, search, backup,
+                metadataFactory, settings);
 
             // Journalled transfers come back as paused, ready to resume (spec §13).
             await session.RestoreTransfersAsync(cancellationToken).ConfigureAwait(false);
@@ -350,3 +352,4 @@ internal sealed class DeviceManager(
         _sessionGate.Dispose();
     }
 }
+

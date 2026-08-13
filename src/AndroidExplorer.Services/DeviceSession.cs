@@ -1,4 +1,4 @@
-using AndroidExplorer.Adb;
+﻿using AndroidExplorer.Adb;
 using AndroidExplorer.Core.Interfaces;
 using AndroidExplorer.Core.Models;
 using AndroidExplorer.Media;
@@ -26,6 +26,7 @@ internal sealed class DeviceSession : IDeviceSession
         IGalleryServiceFactory gallery,
         ISearchServiceFactory search,
         IBackupServiceFactory backup,
+        IMetadataServiceFactory metadata,
         ISettingsService settings)
     {
         Info = info;
@@ -41,6 +42,7 @@ internal sealed class DeviceSession : IDeviceSession
         Storage = search.CreateStorageAnalyzer(info.Id, FileSystem);
         Duplicates = search.CreateDuplicateFinder(info.Id, FileSystem);
         Backup = backup.Create(info.Id, Gallery, settings);
+        Metadata = metadata.Create(info.Id, FileSystem);
     }
 
     public DeviceId DeviceId => Info.Id;
@@ -65,8 +67,7 @@ internal sealed class DeviceSession : IDeviceSession
 
     public IBackupService Backup { get; }
 
-    public IMetadataService Metadata =>
-        throw new NotSupportedException("Metadata arrives in phase 4 (docs/plan/04-gallery.md).");
+    public IMetadataService Metadata { get; }
 
     internal void UpdateInfo(DeviceInfo updated) => Info = updated;
 
@@ -87,3 +88,4 @@ internal sealed class DeviceSession : IDeviceSession
         }
     }
 }
+
